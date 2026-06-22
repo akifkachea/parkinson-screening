@@ -6,7 +6,6 @@
     <title>ระบบคัดกรองความเสี่ยงโรคพาร์กินสัน</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
@@ -173,10 +172,12 @@
 
         <div class="grid md:grid-cols-2 gap-6 items-center">
             <div class="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center gap-3 bg-slate-50">
-                <div id="qr-container" class="bg-white p-3 rounded-xl shadow border border-gray-100 flex items-center justify-center" style="width:170px;height:170px">
-    <i class="fa-solid fa-spinner fa-spin text-3xl text-slate-300"></i>
-</div>
-<span class="text-xs font-mono text-slate-400">SYNC-ID: <span id="sync-id-display" class="text-slate-600 font-bold">...</span></span>
+                <div class="bg-white p-3 rounded-xl shadow border border-gray-100 relative">
+                    <i class="fa-solid fa-qrcode text-6xl text-slate-800"></i>
+                    <div class="absolute inset-0 border-2 border-teal-400 rounded-xl animate-pulse"></div>
+                </div>
+                <span class="text-xs font-mono text-slate-400">SYNC-ID: <span class="text-slate-600 font-bold">993A-FK</span></span>
+            </div>
 
             <div class="space-y-3">
                 <p class="text-xs font-bold text-slate-600">สถานะอุปกรณ์</p>
@@ -194,6 +195,9 @@
         <div class="flex justify-between pt-2 border-t border-slate-100">
             <button onclick="cancelProcess()" class="text-xs text-slate-400 hover:text-slate-700 px-4 py-2 rounded-lg font-bold">
                 <i class="fa-solid fa-arrow-left mr-1"></i> ยกเลิก
+            </button>
+            <button onclick="simulateMobileSync()" class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all">
+                จำลองสแกนสำเร็จ <i class="fa-solid fa-forward ml-1"></i>
             </button>
         </div>
     </div>
@@ -473,9 +477,6 @@ let warmupTapCount = 0;
 
 // Chart instance
 let radarChart = null;
-let sessionId = null;
-let pcSocket = null;
-let mobileResult = null;
 
 // ─────────────────────────────────────────────────────────
 //  SCREENS
@@ -508,8 +509,8 @@ function selectMode(mode) {
     } else if (mode === 'pc') {
         testQueue = ['pc'];
     } else if (mode === 'dual') {
-    testQueue = ['sync', 'pc'];
-}
+        testQueue = ['sync', 'pc', 'mobile-left', 'mobile-right'];
+    }
 
     processNext();
 }
@@ -539,41 +540,10 @@ function processNext() {
 // ─────────────────────────────────────────────────────────
 //  SYNC
 // ─────────────────────────────────────────────────────────
-async function resetSyncUI() {
+function resetSyncUI() {
     document.getElementById('sync-status').className = 'font-bold text-amber-700 flex items-center gap-1.5 pulse-dot';
     document.getElementById('sync-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span>รอสแกน...';
     document.getElementById('sync-mobile-card').className = 'flex items-center justify-between bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs transition-all';
-
-    // สร้าง session จาก backend
-    try {
-        const resp = await fetch('https://parkinson-backend-production-6af7.up.railway.app/session/create', { method: 'POST' });
-        const data = await resp.json();
-        sessionId = data.session_id;
-        document.getElementById('sync-id-display').innerText = sessionId;
-
-        // สร้าง QR Code
-        document.getElementById('qr-container').innerHTML = '';
-        const mobileUrl = `https://akifkachea.github.io/parkinson-screening/?session=${sessionId}&role=mobile`;
-        new QRCode(document.getElementById('qr-container'), { text: mobileUrl, width: 150, height: 150 });
-
-        // เชื่อม WebSocket ฝั่ง PC
-        pcSocket = new WebSocket(`wss://parkinson-backend-production-6af7.up.railway.app/ws/${sessionId}/pc`);
-        pcSocket.onmessage = (e) => {
-            const msg = JSON.parse(e.data);
-            if (msg.event === 'mobile_connected') {
-                document.getElementById('sync-status').className = 'font-bold text-emerald-700 flex items-center gap-1.5';
-                document.getElementById('sync-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span>เชื่อมต่อแล้ว';
-                document.getElementById('sync-mobile-card').className = 'flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs transition-all';
-                setTimeout(() => { queueIdx++; processNext(); }, 900);
-            }
-            if (msg.event === 'mobile_result') {
-                mobileResult = msg.data;
-                if (mobileResult) allResults.push(mobileResult);
-            }
-        };
-    } catch(err) {
-        document.getElementById('qr-container').innerHTML = '<p class="text-xs text-red-400">เชื่อมต่อ Backend ไม่ได้</p>';
-    }
 }
 
 function simulateMobileSync() {
@@ -919,30 +889,8 @@ async function finishTest() {
         stepResult.radar = mockRadar(calibFeatures);
     }
 
-   allResults.push(stepResult);
+    allResults.push(stepResult);
     queueIdx++;
-
-    // ถ้าเป็นมือถือ role และทดสอบครบแล้ว → ส่งผลไป PC
-    if (window._isMobileRole && queueIdx >= testQueue.length && window._mobileSocket) {
-        const avgRisk = allResults.reduce((a,b) => a + (b.risk_probability||0), 0) / allResults.length;
-        window._mobileSocket.send(JSON.stringify({
-            event: 'mobile_result',
-            data: {
-                test_type: 'mobile',
-                risk_probability: avgRisk,
-                radar: allResults[allResults.length-1]?.radar,
-                tap_count: allResults.reduce((a,b) => a + (b.tap_count||0), 0)
-            }
-        }));
-        document.querySelector('main').innerHTML = `
-            <div class="card p-8 text-center space-y-4 mt-10">
-                <div class="text-5xl">✅</div>
-                <h2 class="text-xl font-bold text-teal-700">ส่งผลสำเร็จ!</h2>
-                <p class="text-sm text-slate-500">ผลการทดสอบถูกส่งไปยังคอมพิวเตอร์แล้ว</p>
-            </div>`;
-        return;
-    }
-
     setTimeout(() => processNext(), 600);
 }
 
@@ -1244,40 +1192,13 @@ function simulatePDF() {
     alert('📄 ฟีเจอร์ส่งออก PDF จะพร้อมใช้งานเมื่อเชื่อมต่อ Backend ครับ');
 }
 
-    function clearAll() {
+function clearAll() {
     clearInterval(warmupInterval);
     clearInterval(testInterval);
     window._warmupActive = false;
     window._testActive = false;
     removeInputListeners();
 }
-
-// ── ตรวจสอบว่าเปิดจากมือถือหลังสแกน QR ──
-(function checkMobileRole() {
-    const params = new URLSearchParams(window.location.search);
-    const role = params.get('role');
-    const sid = params.get('session');
-    if (role !== 'mobile' || !sid) return;
-
-    sessionId = sid;
-    currentMode = 'mobile';
-    testQueue = ['mobile-left', 'mobile-right'];
-    queueIdx = 0;
-    allResults = [];
-    window._isMobileRole = true;
-
-    const mobSocket = new WebSocket(`wss://parkinson-backend-production-6af7.up.railway.app/ws/${sid}/mobile`);
-    window._mobileSocket = mobSocket;
-
-    mobSocket.onopen = () => {
-        setupTest('mobile-left');
-        showScreen('screen-test');
-    };
-    mobSocket.onerror = () => {
-        setupTest('mobile-left');
-        showScreen('screen-test');
-    };
-})();
 </script>
 </body>
 </html>
