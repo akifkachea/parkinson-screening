@@ -349,11 +349,14 @@
 <!-- ══════════════ SCREEN: MOBILE THANK-YOU (companion mode) ══════════════ -->
 <div id="screen-mobile-thanks" class="screen">
     <div class="card p-8 text-center space-y-4">
-        <div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-3xl text-emerald-500">
+        <div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-3xl text-emerald-500" id="mobile-thanks-icon">
             <i class="fa-solid fa-circle-check"></i>
         </div>
-        <h2 class="text-lg font-bold text-emerald-700">ส่งผลสำเร็จแล้ว!</h2>
-        <p class="text-sm text-slate-500">ผลการทดสอบของคุณถูกส่งไปยังหน้าคอมพิวเตอร์เรียบร้อยแล้ว<br>คุณสามารถปิดหน้านี้ได้เลยครับ</p>
+        <h2 class="text-lg font-bold text-emerald-700" id="mobile-thanks-title">ส่งผลสำเร็จแล้ว!</h2>
+        <p class="text-sm text-slate-500" id="mobile-thanks-desc">ผลการทดสอบของคุณถูกส่งไปยังหน้าคอมพิวเตอร์เรียบร้อยแล้ว<br>คุณสามารถปิดหน้านี้ได้เลยครับ</p>
+        <button onclick="retrySendCompanionResults()" id="mobile-thanks-retry" class="hidden text-xs font-bold text-rose-600 hover:text-rose-700 underline">
+            ลองส่งผลอีกครั้ง
+        </button>
     </div>
 </div>
 
@@ -504,10 +507,12 @@ let warmupTapCount = 0;
 // Chart instance
 let radarChart = null;
 
-// ── QR / session sync state (WebSocket-based) ──
+// ── QR / session sync state (WebSocket-based, with REST as the reliable path) ──
 let currentSessionId = null;
 let pcSocket = null;
-let sessionPollFallback = null; // fallback REST polling if WS fails
+let sessionPollFallback = null; // REST polling — the path that's actually guaranteed to work
+let pcReconnectTimer = null;
+let pcReconnectAttempts = 0;
 
 // ── Mobile companion-mode state (set if URL has ?mobile=1&session=ID) ──
 let companionMode = false;
@@ -515,6 +520,7 @@ let companionSessionId = null;
 let companionQueue = [];      // ['mobile-left','mobile-right']
 let companionResults = [];
 let companionSocket = null;
+let companionSendFailed = false;
 
 // ─────────────────────────────────────────────────────────
 //  BOOT: detect companion (mobile-scan) mode from URL
@@ -534,19 +540,10 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function startCompanionFlow() {
-    // เปิด WebSocket ไปยัง backend ทันที — ฝั่งคอมจะได้รับ event "mobile_connected" อัตโนมัติ
-    try {
-        companionSocket = new WebSocket(`${WS_BASE}/ws/${companionSessionId}/mobile`);
-        companionSocket.onopen = () => {
-            // ping เป็นระยะเพื่อกัน connection ถูกตัดจาก proxy/timeout
-            companionSocket._pingTimer = setInterval(() => {
-                if (companionSocket && companionSocket.readyState === WebSocket.OPEN) {
-                    companionSocket.send(JSON.stringify({ event: 'ping' }));
-                }
-            }, 25000);
-        };
-        companionSocket.onerror = () => { /* ทำงานต่อแบบ local แม้ ws พลาด */ };
-    } catch (_) { /* เปิด ws ไม่ได้ — ทำแบบทดสอบต่อแบบ local ได้อยู่ */ }
+    // เปิด WebSocket ไปยัง backend ด้วย — เพื่อ best-effort real-time notify
+    // ฝั่ง PC (ถ้า WS รอดตลอด session) แต่ "ทางหลัก" ที่การันตีว่าผลจะถึง
+    // ฝั่งคอมคือการยิง REST POST /push-result ตอนจบ (ดู sendCompanionResultsToDesktop)
+    openCompanionSocket();
 
     currentMode = 'mobile';
     companionQueue = ['mobile-left', 'mobile-right'];
@@ -557,11 +554,87 @@ async function startCompanionFlow() {
     processNext();
 }
 
-function sendCompanionResultsToDesktop() {
+function openCompanionSocket() {
+    try {
+        companionSocket = new WebSocket(`${WS_BASE}/ws/${companionSessionId}/mobile`);
+        companionSocket.onopen = () => {
+            // ping เป็นระยะเพื่อกัน connection ถูกตัดจาก proxy/timeout
+            companionSocket._pingTimer = setInterval(() => {
+                if (companionSocket && companionSocket.readyState === WebSocket.OPEN) {
+                    companionSocket.send(JSON.stringify({ event: 'ping' }));
+                }
+            }, 20000);
+        };
+        companionSocket.onerror = () => { /* ทำงานต่อแบบ local แม้ ws พลาด — REST push ยังทำงานได้ */ };
+    } catch (_) { /* เปิด ws ไม่ได้ — ทำแบบทดสอบต่อแบบ local ได้อยู่ REST push ยังใช้ได้ */ }
+}
+
+/**
+ * ส่งผลของมือถือไปยังฝั่งคอม
+ *
+ * ทางหลัก (reliable path): REST POST ไปที่ /session/{id}/push-result
+ *   เลือกใช้ REST เป็นหลักเพราะ WebSocket ที่เปิดทิ้งไว้นาน (ระหว่างผู้ใช้
+ *   ทำแบบทดสอบ 30+ วินาทีต่อมือ) มีโอกาสถูก proxy/load balancer ตัดทิ้ง
+ *   ก่อนผลจะส่งถึง ทำให้ฝั่งคอมค้างที่หน้า QR แม้มือถือทำเสร็จแล้ว
+ *
+ * ทางเสริม: ถ้า WebSocket ยังเปิดอยู่ ก็ส่งซ้ำไปด้วยเพื่อให้ฝั่งคอมได้รับ
+ *   แบบ real-time (ไม่ต้องรอ poll รอบถัดไป)
+ */
+async function sendCompanionResultsToDesktop() {
+    let restOk = false;
+    try {
+        const resp = await fetch(`${API_BASE}/session/${companionSessionId}/push-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: companionResults })
+        });
+        restOk = resp.ok;
+    } catch (_) {
+        restOk = false;
+    }
+
     if (companionSocket && companionSocket.readyState === WebSocket.OPEN) {
-        companionSocket.send(JSON.stringify({ event: 'mobile_result', data: companionResults }));
+        try {
+            companionSocket.send(JSON.stringify({ event: 'mobile_result', data: companionResults }));
+        } catch (_) { /* ไม่เป็นไร REST เป็นทางหลักอยู่แล้ว */ }
     }
     if (companionSocket && companionSocket._pingTimer) clearInterval(companionSocket._pingTimer);
+
+    companionSendFailed = !restOk;
+    showCompanionThanksScreen(restOk);
+}
+
+function showCompanionThanksScreen(success) {
+    const icon  = document.getElementById('mobile-thanks-icon');
+    const title = document.getElementById('mobile-thanks-title');
+    const desc  = document.getElementById('mobile-thanks-desc');
+    const retry = document.getElementById('mobile-thanks-retry');
+
+    if (success) {
+        icon.className = 'w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-3xl text-emerald-500';
+        icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+        title.className = 'text-lg font-bold text-emerald-700';
+        title.innerText = 'ส่งผลสำเร็จแล้ว!';
+        desc.innerHTML = 'ผลการทดสอบของคุณถูกส่งไปยังหน้าคอมพิวเตอร์เรียบร้อยแล้ว<br>คุณสามารถปิดหน้านี้ได้เลยครับ';
+        retry.classList.add('hidden');
+    } else {
+        icon.className = 'w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto text-3xl text-rose-500';
+        icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+        title.className = 'text-lg font-bold text-rose-700';
+        title.innerText = 'ส่งผลไม่สำเร็จ';
+        desc.innerHTML = 'เชื่อมต่อกับเซิร์ฟเวอร์ไม่ได้ชั่วขณะ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองส่งผลอีกครั้ง<br>(ผลของคุณยังถูกเก็บไว้ในเครื่องนี้ ไม่ต้องทำแบบทดสอบใหม่)';
+        retry.classList.remove('hidden');
+    }
+    showScreen('screen-mobile-thanks');
+}
+
+async function retrySendCompanionResults() {
+    const retry = document.getElementById('mobile-thanks-retry');
+    retry.innerText = 'กำลังส่ง...';
+    retry.disabled = true;
+    await sendCompanionResultsToDesktop();
+    retry.disabled = false;
+    retry.innerText = 'ลองส่งผลอีกครั้ง';
 }
 
 // ─────────────────────────────────────────────────────────
@@ -612,7 +685,9 @@ function cancelProcess() {
 function processNext() {
     if (queueIdx >= testQueue.length) {
         if (companionMode) {
-            showScreen('screen-mobile-thanks');
+            // หน้านี้จะถูกแสดงจริงๆ ตอน sendCompanionResultsToDesktop() เรียก
+            // showCompanionThanksScreen() เท่านั้น (ดู finishTest ด้านล่าง)
+            // ไม่ต้องแสดงตรงนี้ซ้ำ
         } else {
             renderDashboard();
             showScreen('screen-dashboard');
@@ -631,10 +706,11 @@ function processNext() {
 }
 
 // ─────────────────────────────────────────────────────────
-//  SYNC (REAL QR + SESSION POLLING)
+//  SYNC (REAL QR + SESSION POLLING + WEBSOCKET BEST-EFFORT)
 // ─────────────────────────────────────────────────────────
 async function beginSyncSession() {
     _mobileResultHandled = false;
+    pcReconnectAttempts = 0;
     resetSyncUI();
     document.getElementById('qr-canvas-holder').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-3xl text-slate-300"></i>';
     document.getElementById('sync-id-label').innerText = '----';
@@ -653,7 +729,9 @@ async function beginSyncSession() {
     document.getElementById('sync-id-label').innerText = currentSessionId.toUpperCase();
     renderQRCode(currentSessionId);
     connectPcSocket(currentSessionId);
-    startFallbackPolling(currentSessionId); // เผื่อ websocket หลุด/บล็อกโดย network
+    // Fallback REST polling เป็น "ทางหลัก" ที่การันตีว่าจะเจอผลแน่นอน
+    // ไม่ว่า WebSocket จะต่อติดหรือหลุดไปก็ตาม — WS แค่ทำให้เร็วขึ้นถ้าต่อติด
+    startFallbackPolling(currentSessionId);
 }
 
 function connectPcSocket(sessionId) {
@@ -661,11 +739,12 @@ function connectPcSocket(sessionId) {
         pcSocket = new WebSocket(`${WS_BASE}/ws/${sessionId}/pc`);
 
         pcSocket.onopen = () => {
+            pcReconnectAttempts = 0;
             pcSocket._pingTimer = setInterval(() => {
                 if (pcSocket && pcSocket.readyState === WebSocket.OPEN) {
                     pcSocket.send(JSON.stringify({ event: 'ping' }));
                 }
-            }, 25000);
+            }, 20000);
         };
 
         pcSocket.onmessage = (msg) => {
@@ -680,8 +759,22 @@ function connectPcSocket(sessionId) {
             }
         };
 
-        pcSocket.onerror = () => { /* fallback polling จะคอยเช็คซ้ำให้ */ };
-    } catch (_) { /* ใช้ fallback polling อย่างเดียว */ }
+        pcSocket.onerror = () => { /* fallback polling จะคอยเช็คซ้ำให้เสมอ */ };
+
+        pcSocket.onclose = () => {
+            if (pcSocket && pcSocket._pingTimer) clearInterval(pcSocket._pingTimer);
+            pcSocket = null;
+            // ถ้ายังอยู่ในหน้า sync และยังไม่ได้ผล ให้พยายามเชื่อมต่อ WS ใหม่
+            // (ไม่บังคับสำเร็จ เพราะ fallback polling ทำงานคู่กันอยู่แล้ว)
+            const stillWaiting = document.getElementById('screen-sync').classList.contains('active')
+                && !_mobileResultHandled;
+            if (stillWaiting && pcReconnectAttempts < 20) {
+                pcReconnectAttempts++;
+                clearTimeout(pcReconnectTimer);
+                pcReconnectTimer = setTimeout(() => connectPcSocket(sessionId), 2000);
+            }
+        };
+    } catch (_) { /* ใช้ fallback polling อย่างเดียว ก็ยังใช้งานได้สมบูรณ์ */ }
 }
 
 function startFallbackPolling(sessionId) {
@@ -695,13 +788,16 @@ function startFallbackPolling(sessionId) {
                 handleMobileResultReceived(data.data);
             }
         } catch (_) { /* keep retrying */ }
-    }, 2500);
+    }, 2000);
 }
 
 function stopSessionPolling() {
     if (sessionPollFallback) { clearInterval(sessionPollFallback); sessionPollFallback = null; }
+    clearTimeout(pcReconnectTimer);
+    pcReconnectTimer = null;
     if (pcSocket) {
         if (pcSocket._pingTimer) clearInterval(pcSocket._pingTimer);
+        pcSocket.onclose = null; // ป้องกัน reconnect logic ยิงซ้ำตอนปิดเอง
         try { pcSocket.close(); } catch (_) {}
         pcSocket = null;
     }
@@ -733,7 +829,6 @@ function renderQRCode(sessionId) {
     });
 }
 
-// (เดิมมี pollSession() แบบ status polling — แทนที่ด้วย connectPcSocket()/startFallbackPolling() ด้านบนแล้ว)
 function resetSyncUI() {
     document.getElementById('sync-status').className = 'font-bold text-amber-700 flex items-center gap-1.5 pulse-dot';
     document.getElementById('sync-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span>รอสแกน...';
@@ -1107,7 +1202,7 @@ async function finishTest() {
         stepResult.radar = mockRadar(calibFeatures);
     }
 
-    // ── companion mode: stash this hand's result locally, send to desktop via WS once both hands are done ──
+    // ── companion mode: stash this hand's result locally, send to desktop once both hands are done ──
     if (companionMode) {
         companionResults.push({
             test_type: stepResult.test_type,
@@ -1120,7 +1215,9 @@ async function finishTest() {
             tap_count: stepResult.tap_count
         });
         if (companionResults.length >= companionQueue.length) {
-            sendCompanionResultsToDesktop();
+            queueIdx++;
+            await sendCompanionResultsToDesktop(); // ทางหลัก: REST push — มี await เพื่อรอผลให้แน่นอนก่อนเปลี่ยนหน้า
+            return; // sendCompanionResultsToDesktop เปลี่ยนหน้าจอเองแล้ว (เครื่องหมายสำเร็จ/ไม่สำเร็จ)
         }
     }
 
