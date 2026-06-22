@@ -1253,7 +1253,7 @@ function clearAll() {
 }
 
     // ── ตรวจสอบว่าเปิดจากมือถือหลังสแกน QR ──
-(function checkMobileRole() {
+window.addEventListener('load', function checkMobileRole() {
     const params = new URLSearchParams(window.location.search);
     const role = params.get('role');
     const sid = params.get('session');
@@ -1278,7 +1278,7 @@ function clearAll() {
     const origFinish = finishTest;
     window._mobileSocket = mobSocket;
     window._isMobileRole = true;
-})();
+});
 </script>
 </body>
 </html>
