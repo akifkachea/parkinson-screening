@@ -1244,6 +1244,36 @@ function simulatePDF() {
     alert('📄 ฟีเจอร์ส่งออก PDF จะพร้อมใช้งานเมื่อเชื่อมต่อ Backend ครับ');
 }
 
+    // ── ตรวจสอบว่าเปิดจากมือถือหลังสแกน QR ──
+window.addEventListener('load', function checkMobileRole() {
+    const params = new URLSearchParams(window.location.search);
+    const role = params.get('role');
+    const sid = params.get('session');
+    if (role !== 'mobile' || !sid) return;
+
+    sessionId = sid;
+    currentMode = 'mobile';
+    testQueue = ['mobile-left', 'mobile-right'];
+    queueIdx = 0;
+    allResults = [];
+    window._isMobileRole = true;
+
+    // เชื่อม WebSocket ฝั่งมือถือ
+    const mobSocket = new WebSocket(`wss://parkinson-backend-production-6af7.up.railway.app/ws/${sid}/mobile`);
+    window._mobileSocket = mobSocket;
+
+    mobSocket.onopen = () => {
+        setupTest('mobile-left');
+        showScreen('screen-test');
+    };
+
+    mobSocket.onerror = () => {
+        // ถ้า WebSocket ล้มเหลว ให้เริ่มทดสอบได้เลย
+        setupTest('mobile-left');
+        showScreen('screen-test');
+    };
+});
+    
 function clearAll() {
     clearInterval(warmupInterval);
     clearInterval(testInterval);
