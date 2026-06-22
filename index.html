@@ -472,6 +472,7 @@
 //  CONFIG
 // ─────────────────────────────────────────────────────────
 const API_BASE = 'https://parkinson-backend-production-6af7.up.railway.app';
+const WS_BASE  = API_BASE.replace(/^http/, 'ws'); // https -> wss, http -> ws
 
 // ─────────────────────────────────────────────────────────
 //  STATE
@@ -503,15 +504,17 @@ let warmupTapCount = 0;
 // Chart instance
 let radarChart = null;
 
-// ── QR / session sync state ──
+// ── QR / session sync state (WebSocket-based) ──
 let currentSessionId = null;
-let sessionPollHandle = null;
+let pcSocket = null;
+let sessionPollFallback = null; // fallback REST polling if WS fails
 
 // ── Mobile companion-mode state (set if URL has ?mobile=1&session=ID) ──
 let companionMode = false;
 let companionSessionId = null;
 let companionQueue = [];      // ['mobile-left','mobile-right']
 let companionResults = [];
+let companionSocket = null;
 
 // ─────────────────────────────────────────────────────────
 //  BOOT: detect companion (mobile-scan) mode from URL
@@ -531,17 +534,34 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function startCompanionFlow() {
-    // tell backend the phone connected
+    // เปิด WebSocket ไปยัง backend ทันที — ฝั่งคอมจะได้รับ event "mobile_connected" อัตโนมัติ
     try {
-        await fetch(`${API_BASE}/api/session/${companionSessionId}/connect`, { method: 'POST' });
-    } catch (_) { /* backend offline — continue locally anyway */ }
+        companionSocket = new WebSocket(`${WS_BASE}/ws/${companionSessionId}/mobile`);
+        companionSocket.onopen = () => {
+            // ping เป็นระยะเพื่อกัน connection ถูกตัดจาก proxy/timeout
+            companionSocket._pingTimer = setInterval(() => {
+                if (companionSocket && companionSocket.readyState === WebSocket.OPEN) {
+                    companionSocket.send(JSON.stringify({ event: 'ping' }));
+                }
+            }, 25000);
+        };
+        companionSocket.onerror = () => { /* ทำงานต่อแบบ local แม้ ws พลาด */ };
+    } catch (_) { /* เปิด ws ไม่ได้ — ทำแบบทดสอบต่อแบบ local ได้อยู่ */ }
 
     currentMode = 'mobile';
     companionQueue = ['mobile-left', 'mobile-right'];
     queueIdx = 0;
     testQueue = companionQueue;
     allResults = [];
+    companionResults = [];
     processNext();
+}
+
+function sendCompanionResultsToDesktop() {
+    if (companionSocket && companionSocket.readyState === WebSocket.OPEN) {
+        companionSocket.send(JSON.stringify({ event: 'mobile_result', data: companionResults }));
+    }
+    if (companionSocket && companionSocket._pingTimer) clearInterval(companionSocket._pingTimer);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -585,6 +605,7 @@ function selectMode(mode) {
 function cancelProcess() {
     clearAll();
     stopSessionPolling();
+    _mobileResultHandled = false;
     showScreen('screen-welcome');
 }
 
@@ -613,12 +634,13 @@ function processNext() {
 //  SYNC (REAL QR + SESSION POLLING)
 // ─────────────────────────────────────────────────────────
 async function beginSyncSession() {
+    _mobileResultHandled = false;
     resetSyncUI();
     document.getElementById('qr-canvas-holder').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-3xl text-slate-300"></i>';
     document.getElementById('sync-id-label').innerText = '----';
 
     try {
-        const resp = await fetch(`${API_BASE}/api/session/create`, { method: 'POST' });
+        const resp = await fetch(`${API_BASE}/session/create`, { method: 'POST' });
         if (!resp.ok) throw new Error('create session failed');
         const data = await resp.json();
         currentSessionId = data.session_id;
@@ -630,7 +652,70 @@ async function beginSyncSession() {
 
     document.getElementById('sync-id-label').innerText = currentSessionId.toUpperCase();
     renderQRCode(currentSessionId);
-    pollSession(currentSessionId);
+    connectPcSocket(currentSessionId);
+    startFallbackPolling(currentSessionId); // เผื่อ websocket หลุด/บล็อกโดย network
+}
+
+function connectPcSocket(sessionId) {
+    try {
+        pcSocket = new WebSocket(`${WS_BASE}/ws/${sessionId}/pc`);
+
+        pcSocket.onopen = () => {
+            pcSocket._pingTimer = setInterval(() => {
+                if (pcSocket && pcSocket.readyState === WebSocket.OPEN) {
+                    pcSocket.send(JSON.stringify({ event: 'ping' }));
+                }
+            }, 25000);
+        };
+
+        pcSocket.onmessage = (msg) => {
+            let payload;
+            try { payload = JSON.parse(msg.data); } catch (_) { return; }
+
+            if (payload.event === 'mobile_connected') {
+                setSyncConnectedUI();
+            }
+            if (payload.event === 'mobile_result' && payload.data) {
+                handleMobileResultReceived(payload.data);
+            }
+        };
+
+        pcSocket.onerror = () => { /* fallback polling จะคอยเช็คซ้ำให้ */ };
+    } catch (_) { /* ใช้ fallback polling อย่างเดียว */ }
+}
+
+function startFallbackPolling(sessionId) {
+    stopSessionPolling();
+    sessionPollFallback = setInterval(async () => {
+        try {
+            const resp = await fetch(`${API_BASE}/session/${sessionId}/result`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.status === 'ready' && data.data) {
+                handleMobileResultReceived(data.data);
+            }
+        } catch (_) { /* keep retrying */ }
+    }, 2500);
+}
+
+function stopSessionPolling() {
+    if (sessionPollFallback) { clearInterval(sessionPollFallback); sessionPollFallback = null; }
+    if (pcSocket) {
+        if (pcSocket._pingTimer) clearInterval(pcSocket._pingTimer);
+        try { pcSocket.close(); } catch (_) {}
+        pcSocket = null;
+    }
+}
+
+let _mobileResultHandled = false;
+function handleMobileResultReceived(resultsArray) {
+    if (_mobileResultHandled) return; // กันรับซ้ำจากทั้ง ws และ fallback poll
+    _mobileResultHandled = true;
+    setSyncConnectedUI();
+    updateSyncProgressUI(resultsArray);
+    stopSessionPolling();
+    ingestMobileResults(resultsArray);
+    setTimeout(() => { queueIdx++; processNext(); }, 700);
 }
 
 function renderQRCode(sessionId) {
@@ -648,34 +733,7 @@ function renderQRCode(sessionId) {
     });
 }
 
-function pollSession(sessionId) {
-    stopSessionPolling();
-    sessionPollHandle = setInterval(async () => {
-        try {
-            const resp = await fetch(`${API_BASE}/api/session/${sessionId}`);
-            if (!resp.ok) return;
-            const data = await resp.json();
-
-            if (data.status === 'connected') {
-                setSyncConnectedUI();
-            }
-            if (data.status === 'connected' || data.status === 'done') {
-                updateSyncProgressUI(data.results || []);
-            }
-            if (data.status === 'done') {
-                stopSessionPolling();
-                ingestMobileResults(data.results || []);
-                setTimeout(() => { queueIdx++; processNext(); }, 700);
-            }
-        } catch (_) { /* keep retrying */ }
-    }, 1800);
-}
-
-function stopSessionPolling() {
-    if (sessionPollHandle) { clearInterval(sessionPollHandle); sessionPollHandle = null; }
-}
-
-function resetSyncUI() {
+// (เดิมมี pollSession() แบบ status polling — แทนที่ด้วย connectPcSocket()/startFallbackPolling() ด้านบนแล้ว)function resetSyncUI() {
     document.getElementById('sync-status').className = 'font-bold text-amber-700 flex items-center gap-1.5 pulse-dot';
     document.getElementById('sync-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span>รอสแกน...';
     document.getElementById('sync-mobile-card').className = 'flex items-center justify-between bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs transition-all';
@@ -1048,24 +1106,21 @@ async function finishTest() {
         stepResult.radar = mockRadar(calibFeatures);
     }
 
-    // ── companion mode: forward this hand's result into the shared QR session ──
+    // ── companion mode: stash this hand's result locally, send to desktop via WS once both hands are done ──
     if (companionMode) {
-        try {
-            await fetch(`${API_BASE}/api/session/${companionSessionId}/submit`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    test_type: stepResult.test_type,
-                    risk_percentage: stepResult.risk_probability,
-                    risk_level: stepResult.xai_title || null,
-                    xai_explanation: stepResult.xai_desc || null,
-                    radar_metrics: stepResult.radar,
-                    raw_features: stepResult.raw_features,
-                    calibrated_features: stepResult.calibrated_features,
-                    tap_count: stepResult.tap_count
-                })
-            });
-        } catch (_) { /* if this fails the desktop side just won't see this hand */ }
+        companionResults.push({
+            test_type: stepResult.test_type,
+            risk_percentage: stepResult.risk_probability,
+            risk_level: stepResult.xai_title || null,
+            xai_explanation: stepResult.xai_desc || null,
+            radar_metrics: stepResult.radar,
+            raw_features: stepResult.raw_features,
+            calibrated_features: stepResult.calibrated_features,
+            tap_count: stepResult.tap_count
+        });
+        if (companionResults.length >= companionQueue.length) {
+            sendCompanionResultsToDesktop();
+        }
     }
 
     allResults.push(stepResult);
