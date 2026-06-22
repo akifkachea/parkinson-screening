@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Sarabun', sans-serif; background: #F0F4F8; color: #1a202c; }
@@ -172,10 +173,12 @@
         <div class="grid md:grid-cols-2 gap-6 items-center">
             <div class="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center gap-3 bg-slate-50">
                 <div class="bg-white p-3 rounded-xl shadow border border-gray-100 relative">
-                    <i class="fa-solid fa-qrcode text-6xl text-slate-800"></i>
-                    <div class="absolute inset-0 border-2 border-teal-400 rounded-xl animate-pulse"></div>
+                    <div id="qr-canvas-holder" class="flex items-center justify-center" style="width:170px;height:170px;">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl text-slate-300"></i>
+                    </div>
+                    <div class="absolute inset-0 border-2 border-teal-400 rounded-xl animate-pulse pointer-events-none"></div>
                 </div>
-                <span class="text-xs font-mono text-slate-400">SYNC-ID: <span class="text-slate-600 font-bold">993A-FK</span></span>
+                <span class="text-xs font-mono text-slate-400">SYNC-ID: <span id="sync-id-label" class="text-slate-600 font-bold">----</span></span>
             </div>
 
             <div class="space-y-3">
@@ -188,6 +191,10 @@
                     <span class="flex items-center gap-2 text-slate-600"><i class="fa-solid fa-mobile-screen"></i> สมาร์ทโฟน</span>
                     <span id="sync-status" class="font-bold text-amber-700 flex items-center gap-1.5 pulse-dot"><span class="w-2 h-2 rounded-full bg-amber-400"></span>รอสแกน...</span>
                 </div>
+                <div id="sync-progress-card" class="hidden flex items-center justify-between bg-blue-50 border border-blue-200 p-3 rounded-xl text-xs transition-all">
+                    <span class="flex items-center gap-2 text-slate-600"><i class="fa-solid fa-hand-pointer"></i> กำลังทำแบบทดสอบ</span>
+                    <span id="sync-progress-label" class="font-bold text-blue-700">มือซ้าย...</span>
+                </div>
             </div>
         </div>
 
@@ -195,9 +202,7 @@
             <button onclick="cancelProcess()" class="text-xs text-slate-400 hover:text-slate-700 px-4 py-2 rounded-lg font-bold">
                 <i class="fa-solid fa-arrow-left mr-1"></i> ยกเลิก
             </button>
-            <button onclick="simulateMobileSync()" class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all">
-                จำลองสแกนสำเร็จ <i class="fa-solid fa-forward ml-1"></i>
-            </button>
+            <span class="text-xs text-slate-400 italic">รอการเชื่อมต่อจากมือถือโดยอัตโนมัติ...</span>
         </div>
     </div>
 </div>
@@ -341,11 +346,22 @@
 
 </div>
 
+<!-- ══════════════ SCREEN: MOBILE THANK-YOU (companion mode) ══════════════ -->
+<div id="screen-mobile-thanks" class="screen">
+    <div class="card p-8 text-center space-y-4">
+        <div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-3xl text-emerald-500">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <h2 class="text-lg font-bold text-emerald-700">ส่งผลสำเร็จแล้ว!</h2>
+        <p class="text-sm text-slate-500">ผลการทดสอบของคุณถูกส่งไปยังหน้าคอมพิวเตอร์เรียบร้อยแล้ว<br>คุณสามารถปิดหน้านี้ได้เลยครับ</p>
+    </div>
+</div>
+
 <!-- ══════════════ SCREEN: DASHBOARD ══════════════ -->
 <div id="screen-dashboard" class="screen space-y-5">
 
     <!-- Hero Card -->
-    <div class="card bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 flex flex-col sm:flex-row items-center gap-6">
+    <div class="card bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 flex flex-col sm:flex-row items-center gap-6" id="dashboard-capture">
         <div class="flex-1 space-y-2 text-center sm:text-left">
             <div class="badge bg-white/10 text-slate-300 border border-white/10">
                 <i class="fa-solid fa-file-medical text-teal-400"></i> รายงานผลการคัดกรอง
@@ -413,9 +429,9 @@
                 </div>
             </div>
 
-            <button onclick="simulatePDF()"
+            <button onclick="downloadPDFReport()" id="pdf-btn"
                 class="card p-3.5 flex items-center justify-center gap-2 text-rose-600 hover:bg-rose-50 text-sm font-bold border-rose-100 transition-all cursor-pointer">
-                <i class="fa-solid fa-file-pdf text-rose-500"></i> ดาวน์โหลด PDF
+                <i class="fa-solid fa-file-pdf text-rose-500"></i> <span id="pdf-btn-label">ดาวน์โหลด PDF</span>
             </button>
 
             <button onclick="cancelProcess()"
@@ -443,10 +459,20 @@
     โครงงานวิจัยคัดกรองสุขภาพดิจิทัลเชิงรุก · Keystroke Dynamics · XGBoost v5 + ONNX
 </footer>
 
+<!-- QR + PDF libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <!-- ══════════════════════════════════════════════════════
      JAVASCRIPT
 ══════════════════════════════════════════════════════ -->
 <script>
+// ─────────────────────────────────────────────────────────
+//  CONFIG
+// ─────────────────────────────────────────────────────────
+const API_BASE = 'https://parkinson-backend-production-6af7.up.railway.app';
+
 // ─────────────────────────────────────────────────────────
 //  STATE
 // ─────────────────────────────────────────────────────────
@@ -476,6 +502,47 @@ let warmupTapCount = 0;
 
 // Chart instance
 let radarChart = null;
+
+// ── QR / session sync state ──
+let currentSessionId = null;
+let sessionPollHandle = null;
+
+// ── Mobile companion-mode state (set if URL has ?mobile=1&session=ID) ──
+let companionMode = false;
+let companionSessionId = null;
+let companionQueue = [];      // ['mobile-left','mobile-right']
+let companionResults = [];
+
+// ─────────────────────────────────────────────────────────
+//  BOOT: detect companion (mobile-scan) mode from URL
+// ─────────────────────────────────────────────────────────
+(function detectCompanionMode() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mobile') === '1' && params.get('session')) {
+        companionMode = true;
+        companionSessionId = params.get('session');
+    }
+})();
+
+window.addEventListener('DOMContentLoaded', () => {
+    if (companionMode) {
+        startCompanionFlow();
+    }
+});
+
+async function startCompanionFlow() {
+    // tell backend the phone connected
+    try {
+        await fetch(`${API_BASE}/api/session/${companionSessionId}/connect`, { method: 'POST' });
+    } catch (_) { /* backend offline — continue locally anyway */ }
+
+    currentMode = 'mobile';
+    companionQueue = ['mobile-left', 'mobile-right'];
+    queueIdx = 0;
+    testQueue = companionQueue;
+    allResults = [];
+    processNext();
+}
 
 // ─────────────────────────────────────────────────────────
 //  SCREENS
@@ -508,7 +575,8 @@ function selectMode(mode) {
     } else if (mode === 'pc') {
         testQueue = ['pc'];
     } else if (mode === 'dual') {
-        testQueue = ['sync', 'pc', 'mobile-left', 'mobile-right'];
+        // มือถือทำผ่าน QR sync (ไม่อยู่ใน local queue อีกต่อไป) แล้วค่อยทำคีย์บอร์ดบนคอม
+        testQueue = ['sync', 'pc'];
     }
 
     processNext();
@@ -516,20 +584,25 @@ function selectMode(mode) {
 
 function cancelProcess() {
     clearAll();
+    stopSessionPolling();
     showScreen('screen-welcome');
 }
 
 function processNext() {
     if (queueIdx >= testQueue.length) {
-        renderDashboard();
-        showScreen('screen-dashboard');
+        if (companionMode) {
+            showScreen('screen-mobile-thanks');
+        } else {
+            renderDashboard();
+            showScreen('screen-dashboard');
+        }
         return;
     }
 
     const task = testQueue[queueIdx];
     if (task === 'sync') {
-        resetSyncUI();
         showScreen('screen-sync');
+        beginSyncSession();
     } else {
         setupTest(task);
         showScreen('screen-test');
@@ -537,19 +610,107 @@ function processNext() {
 }
 
 // ─────────────────────────────────────────────────────────
-//  SYNC
+//  SYNC (REAL QR + SESSION POLLING)
 // ─────────────────────────────────────────────────────────
+async function beginSyncSession() {
+    resetSyncUI();
+    document.getElementById('qr-canvas-holder').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-3xl text-slate-300"></i>';
+    document.getElementById('sync-id-label').innerText = '----';
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/session/create`, { method: 'POST' });
+        if (!resp.ok) throw new Error('create session failed');
+        const data = await resp.json();
+        currentSessionId = data.session_id;
+    } catch (err) {
+        document.getElementById('qr-canvas-holder').innerHTML =
+            '<span class="text-xs text-rose-500 px-2 text-center">เชื่อมต่อ Backend ไม่ได้<br>ลองใหม่อีกครั้ง</span>';
+        return;
+    }
+
+    document.getElementById('sync-id-label').innerText = currentSessionId.toUpperCase();
+    renderQRCode(currentSessionId);
+    pollSession(currentSessionId);
+}
+
+function renderQRCode(sessionId) {
+    const joinUrl = `${window.location.origin}${window.location.pathname}?mobile=1&session=${sessionId}`;
+    const holder = document.getElementById('qr-canvas-holder');
+    holder.innerHTML = '';
+    // QRCode.js (global "QRCode")
+    new QRCode(holder, {
+        text: joinUrl,
+        width: 170,
+        height: 170,
+        colorDark: '#0f172a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+    });
+}
+
+function pollSession(sessionId) {
+    stopSessionPolling();
+    sessionPollHandle = setInterval(async () => {
+        try {
+            const resp = await fetch(`${API_BASE}/api/session/${sessionId}`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (data.status === 'connected') {
+                setSyncConnectedUI();
+            }
+            if (data.status === 'connected' || data.status === 'done') {
+                updateSyncProgressUI(data.results || []);
+            }
+            if (data.status === 'done') {
+                stopSessionPolling();
+                ingestMobileResults(data.results || []);
+                setTimeout(() => { queueIdx++; processNext(); }, 700);
+            }
+        } catch (_) { /* keep retrying */ }
+    }, 1800);
+}
+
+function stopSessionPolling() {
+    if (sessionPollHandle) { clearInterval(sessionPollHandle); sessionPollHandle = null; }
+}
+
 function resetSyncUI() {
     document.getElementById('sync-status').className = 'font-bold text-amber-700 flex items-center gap-1.5 pulse-dot';
     document.getElementById('sync-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span>รอสแกน...';
     document.getElementById('sync-mobile-card').className = 'flex items-center justify-between bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs transition-all';
+    document.getElementById('sync-progress-card').classList.add('hidden');
 }
 
-function simulateMobileSync() {
+function setSyncConnectedUI() {
     document.getElementById('sync-status').className = 'font-bold text-emerald-700 flex items-center gap-1.5';
     document.getElementById('sync-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span>เชื่อมต่อแล้ว';
     document.getElementById('sync-mobile-card').className = 'flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs transition-all';
-    setTimeout(() => { queueIdx++; processNext(); }, 900);
+    document.getElementById('sync-progress-card').classList.remove('hidden');
+}
+
+function updateSyncProgressUI(results) {
+    const label = document.getElementById('sync-progress-label');
+    if (results.length === 0) label.innerText = 'มือซ้าย...';
+    else if (results.length === 1) label.innerText = 'มือขวา...';
+    else label.innerText = 'เสร็จสิ้น ✓';
+}
+
+function ingestMobileResults(results) {
+    // results = [{test_type, risk_percentage, risk_level, xai_explanation, radar_metrics, raw_features, calibrated_features, tap_count}, ...]
+    results.forEach(r => {
+        allResults.push({
+            test_type: r.test_type,
+            tap_count: r.tap_count,
+            raw_features: r.raw_features || {},
+            calibrated_features: r.calibrated_features || {},
+            calib_baseline: {},
+            risk_probability: r.risk_percentage,
+            radar: r.radar_metrics,
+            xai_title: r.risk_level,
+            xai_desc: r.xai_explanation,
+        });
+    });
 }
 
 // ─────────────────────────────────────────────────────────
@@ -600,7 +761,7 @@ function showPhase(phase) {
 }
 
 // ─────────────────────────────────────────────────────────
-//  WARMUP PHASE (30s)
+//  WARMUP PHASE (15s)
 // ─────────────────────────────────────────────────────────
 function startWarmup() {
     showPhase('warmup');
@@ -625,7 +786,7 @@ function startWarmup() {
         document.getElementById('warmup-timer').innerText = timeLeft;
         arc.style.strokeDashoffset = ((15 - timeLeft) / 15 * 204).toString();
 
-        // Show calibration preview after 10 taps
+        // Show calibration preview after 6 taps
         if (warmupTapCount >= 6) {
             updateCalibPreview();
             document.getElementById('calib-preview').classList.remove('hidden');
@@ -858,20 +1019,19 @@ async function finishTest() {
     };
 
     try {
-        const resp = await fetch('https://parkinson-backend-production-6af7.up.railway.app/api/analyze', {
+        const resp = await fetch(`${API_BASE}/api/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            
             body: JSON.stringify({
-    test_type: currentTestType,
-    device: currentMode,
-    ht_array_ms: ht,              // ← เพิ่ม
-    ft_array_ms: ft,              // ← เพิ่ม
-    calib_baseline: calibBaseline,
-    calibrated_features: calibFeatures,
-    raw_features: rawFeatures,
-    tap_count: tapCount
-})
+                test_type: currentTestType,
+                device: companionMode ? 'mobile' : currentMode,
+                ht_array_ms: ht,
+                ft_array_ms: ft,
+                calib_baseline: calibBaseline,
+                calibrated_features: calibFeatures,
+                raw_features: rawFeatures,
+                tap_count: tapCount
+            })
         });
         if (resp.ok) {
             const data = await resp.json();
@@ -886,6 +1046,26 @@ async function finishTest() {
         // Backend not running — use mock
         stepResult.risk_probability = mockRisk(calibFeatures);
         stepResult.radar = mockRadar(calibFeatures);
+    }
+
+    // ── companion mode: forward this hand's result into the shared QR session ──
+    if (companionMode) {
+        try {
+            await fetch(`${API_BASE}/api/session/${companionSessionId}/submit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    test_type: stepResult.test_type,
+                    risk_percentage: stepResult.risk_probability,
+                    risk_level: stepResult.xai_title || null,
+                    xai_explanation: stepResult.xai_desc || null,
+                    radar_metrics: stepResult.radar,
+                    raw_features: stepResult.raw_features,
+                    calibrated_features: stepResult.calibrated_features,
+                    tap_count: stepResult.tap_count
+                })
+            });
+        } catch (_) { /* if this fails the desktop side just won't see this hand */ }
     }
 
     allResults.push(stepResult);
@@ -1054,13 +1234,13 @@ function renderDashboard() {
     const lastWithRadar = [...allResults].reverse().find(r => r.radar);
     const radar = lastWithRadar ? lastWithRadar.radar : [75, 68, 80, 72, 70];
 
-    // Calib ratios (last result)
-    const lastCalib = allResults[allResults.length - 1]?.calibrated_features;
+    // Calib ratios (last result that actually has them)
+    const lastCalib = [...allResults].reverse().find(r => r.calibrated_features && r.calibrated_features._ht_ratio)?.calibrated_features;
     document.getElementById('calib-ratio-ht').innerText = lastCalib?._ht_ratio ?? '--';
     document.getElementById('calib-ratio-ft').innerText = lastCalib?._ft_ratio ?? '--';
 
     // Mode label
-    const modeLabels = { pc: 'คีย์บอร์ด', mobile: 'สมาร์ทโฟน', dual: 'คีย์บอร์ด + สมาร์ทโฟน' };
+    const modeLabels = { pc: 'คีย์บอร์ด', mobile: 'สมาร์ทโฟน', dual: 'คีย์บอร์ด + สมาร์ทโฟน (QR Sync)' };
     document.getElementById('dash-mode-text').innerText = `โหมด: ${modeLabels[currentMode] || currentMode} · ${allResults.length} การทดสอบ`;
 
     // Risk ring
@@ -1177,8 +1357,8 @@ function renderDashboard() {
             risk: r.risk_probability,
             calib_ht_ratio: r.calibrated_features?._ht_ratio,
             calib_ft_ratio: r.calibrated_features?._ft_ratio,
-            ht_mean_raw: r.raw_features?.ht_mean?.toFixed(2),
-            ht_cv_raw: r.raw_features?.ht_cv?.toFixed(4),
+            ht_mean_raw: r.raw_features?.ht_mean?.toFixed ? r.raw_features.ht_mean.toFixed(2) : r.raw_features?.ht_mean,
+            ht_cv_raw: r.raw_features?.ht_cv?.toFixed ? r.raw_features.ht_cv.toFixed(4) : r.raw_features?.ht_cv,
         }))
     }, null, 2);
 }
@@ -1187,8 +1367,60 @@ function toggleDebug() {
     document.getElementById('debug-panel').classList.toggle('hidden');
 }
 
-function simulatePDF() {
-    alert('📄 ฟีเจอร์ส่งออก PDF จะพร้อมใช้งานเมื่อเชื่อมต่อ Backend ครับ');
+// ─────────────────────────────────────────────────────────
+//  PDF EXPORT (real) — html2canvas + jsPDF
+// ─────────────────────────────────────────────────────────
+async function downloadPDFReport() {
+    const btn = document.getElementById('pdf-btn');
+    const label = document.getElementById('pdf-btn-label');
+    const original = label.innerText;
+    btn.style.pointerEvents = 'none';
+    label.innerText = 'กำลังสร้าง PDF...';
+
+    try {
+        const dashboardEl = document.getElementById('screen-dashboard');
+
+        // make sure debug panel state doesn't affect capture; capture full dashboard screen
+        const canvas = await html2canvas(dashboardEl, {
+            scale: 2,
+            backgroundColor: '#F0F4F8',
+            useCORS: true,
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+
+        const pageWidth  = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        const imgWidth  = pageWidth - 20; // 10mm margin each side
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = 10;
+
+        pdf.setFontSize(14);
+        pdf.text('Parkinson Risk Screening Report', 10, 8);
+
+        pdf.addImage(imgData, 'PNG', 10, position + 8, imgWidth, imgHeight);
+        heightLeft -= (pageHeight - position - 8);
+
+        while (heightLeft > 0) {
+            pdf.addPage();
+            position = heightLeft - imgHeight;
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+        }
+
+        const dateStr = new Date().toISOString().slice(0,10);
+        pdf.save(`parkinson-screening-report-${dateStr}.pdf`);
+    } catch (err) {
+        alert('สร้าง PDF ไม่สำเร็จ: ' + err.message);
+    } finally {
+        btn.style.pointerEvents = 'auto';
+        label.innerText = original;
+    }
 }
 
 function clearAll() {
