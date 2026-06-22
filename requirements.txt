@@ -1,6 +1,0 @@
-fastapi
-uvicorn
-xgboost
-numpy
-scipy
-pydantic
