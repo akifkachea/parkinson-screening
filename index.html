@@ -1244,30 +1244,16 @@ function simulatePDF() {
     alert('📄 ฟีเจอร์ส่งออก PDF จะพร้อมใช้งานเมื่อเชื่อมต่อ Backend ครับ');
 }
 
-    // ── ตรวจสอบว่าเปิดจากมือถือหลังสแกน QR ──
-window.addEventListener('load', function checkMobileRole() {
-    const params = new URLSearchParams(window.location.search);
-    const role = params.get('role');
-    const sid = params.get('session');
-    if (role !== 'mobile' || !sid) return;
+    function clearAll() {
+    clearInterval(warmupInterval);
+    clearInterval(testInterval);
+    window._warmupActive = false;
+    window._testActive = false;
+    removeInputListeners();
+}
 
-    sessionId = sid;
-    currentMode = 'mobile';
-    testQueue = ['mobile-left', 'mobile-right'];
-    queueIdx = 0;
-    allResults = [];
-    window._isMobileRole = true;
-
-    // เชื่อม WebSocket ฝั่งมือถือ
-    const mobSocket = new WebSocket(`wss://parkinson-backend-production-6af7.up.railway.app/ws/${sid}/mobile`);
-    window._mobileSocket = mobSocket;
-
-    mobSocket.onopen = () => {
-        setupTest('mobile-left');
-        showScreen('screen-test');
-    };
-
-   window.addEventListener('load', function checkMobileRole() {
+// ── ตรวจสอบว่าเปิดจากมือถือหลังสแกน QR ──
+(function checkMobileRole() {
     const params = new URLSearchParams(window.location.search);
     const role = params.get('role');
     const sid = params.get('session');
@@ -1291,43 +1277,7 @@ window.addEventListener('load', function checkMobileRole() {
         setupTest('mobile-left');
         showScreen('screen-test');
     };
-});
-    
-function clearAll() {
-    clearInterval(warmupInterval);
-    clearInterval(testInterval);
-    window._warmupActive = false;
-    window._testActive = false;
-    removeInputListeners();
-}
-
-    // ── ตรวจสอบว่าเปิดจากมือถือหลังสแกน QR ──
-window.addEventListener('load', function checkMobileRole() {
-    const params = new URLSearchParams(window.location.search);
-    const role = params.get('role');
-    const sid = params.get('session');
-    if (role !== 'mobile' || !sid) return;
-
-    sessionId = sid;
-    // ซ่อน welcome screen แล้วเริ่มทดสอบมือถือทันที
-    currentMode = 'mobile';
-    testQueue = ['mobile-left', 'mobile-right'];
-    queueIdx = 0;
-    allResults = [];
-
-    // เชื่อม WebSocket ฝั่งมือถือ
-    const mobSocket = new WebSocket(`wss://parkinson-backend-production-6af7.up.railway.app/ws/${sid}/mobile`);
-    mobSocket.onopen = () => {
-        // เริ่มทดสอบ
-        setupTest('mobile-left');
-        showScreen('screen-test');
-    };
-
-    // Override finishTest เพื่อส่งผลผ่าน WebSocket แทน
-    const origFinish = finishTest;
-    window._mobileSocket = mobSocket;
-    window._isMobileRole = true;
-});
+})();
 </script>
 </body>
 </html>
