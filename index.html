@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบคัดกรองความเสี่ยงโรคพาร์กินสัน</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', sans-serif; background: #F0F4F8; color: #1a202c; }
+
+        /* ── PHASE STEPPER ── */
+        .phase-dot { width:10px; height:10px; border-radius:50%; background:#CBD5E0; transition: background 0.4s; }
+        .phase-dot.active { background:#0D9488; }
+        .phase-dot.done { background:#6EE7B7; }
+        .phase-line { flex:1; height:2px; background:#CBD5E0; }
+
+        /* ── KEY BUTTONS ── */
+        .key-btn {
+            width: 96px; height: 96px;
+            border-radius: 16px;
+            border: 3px solid #CBD5E0;
+            background: white;
+            font-size: 2rem; font-weight: 800; font-family: monospace;
+            color: #64748b;
+            display: flex; align-items:center; justify-content:center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: all 0.08s;
+            user-select: none; -webkit-user-select:none;
+        }
+        .key-btn.pressed-f { background:#DBEAFE; border-color:#3B82F6; color:#1D4ED8; transform:scale(0.92); box-shadow:0 1px 4px rgba(59,130,246,0.4); }
+        .key-btn.pressed-k { background:#D1FAE5; border-color:#10B981; color:#065F46; transform:scale(0.92); box-shadow:0 1px 4px rgba(16,185,129,0.4); }
+        .key-btn.warmup { background:#FEF9C3; border-color:#F59E0B; color:#92400E; transform:scale(0.92); box-shadow:0 1px 4px rgba(245,158,11,0.4); }
+
+        /* touch buttons */
+        .touch-btn {
+            width:140px; height:140px;
+            border-radius:24px;
+            border:3px solid #CBD5E0;
+            background:white;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:8px; font-size:0.75rem; font-weight:700; color:#64748b;
+            box-shadow:0 4px 16px rgba(0,0,0,0.08);
+            transition: all 0.08s;
+            cursor:pointer; user-select:none; -webkit-user-select:none;
+        }
+        .touch-btn .finger-ring { width:40px; height:40px; border-radius:50%; border:3px dashed #CBD5E0; pointer-events:none; }
+        .touch-btn.pressed { background:#CCFBF1; border-color:#0D9488; transform:scale(0.93); box-shadow:0 1px 6px rgba(13,148,136,0.4); }
+        .touch-btn.pressed .finger-ring { border-color:#0D9488; }
+
+        /* ── PROGRESS ARC ── */
+        .arc-track { stroke: #E2E8F0; }
+        .arc-fill  { stroke: #0D9488; stroke-linecap: round; transition: stroke-dashoffset 0.5s linear; }
+        .arc-fill.warmup  { stroke: #F59E0B; }
+        .arc-fill.danger  { stroke: #EF4444; }
+
+        /* ── RISK RING ── */
+        .risk-ring-fill { transition: stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1); }
+
+        /* ── CARDS ── */
+        .card { background:white; border-radius:20px; box-shadow:0 2px 12px rgba(0,0,0,0.06); border:1px solid #E2E8F0; }
+
+        /* ── BADGE ── */
+        .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:999px; font-size:0.7rem; font-weight:700; }
+
+        /* ── PULSE DOT ── */
+        @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.3)} }
+        .pulse-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+        /* ── RHYTHM BARS ── */
+        .rhythm-bar { width:6px; border-radius:3px; background:#CBD5E0; transition: height 0.15s; }
+
+        /* ── SCREEN TRANSITIONS ── */
+        .screen { display:none; }
+        .screen.active { display:block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+        /* ── XAI BARS ── */
+        .xai-bar { height:8px; border-radius:4px; transition: width 1s ease; }
+
+        @media (max-width:640px) {
+            .key-btn { width:80px; height:80px; font-size:1.6rem; }
+            .touch-btn { width:120px; height:120px; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header class="bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-xl px-4 py-3">
+    <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-white/10 backdrop-blur rounded-xl flex items-center justify-center border border-white/20">
+                <i class="fa-solid fa-brain text-teal-300 text-lg"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold leading-tight">ระบบคัดกรองความเสี่ยงโรคพาร์กินสัน</h1>
+                <p class="text-xs text-blue-300">Keystroke Dynamics · AI-Powered Screening</p>
+            </div>
+        </div>
+        <button onclick="toggleAudio()" id="audio-btn"
+            class="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
+            <i id="audio-icon" class="fa-solid fa-volume-high text-teal-300"></i>
+            <span class="hidden sm:inline">เสียงแนะนำ</span>
+        </button>
+    </div>
+</header>
+
+<main class="flex-grow max-w-4xl w-full mx-auto px-4 py-6 space-y-5">
+
+<!-- ══════════════ SCREEN: WELCOME ══════════════ -->
+<div id="screen-welcome" class="screen active space-y-5">
+    <div class="card p-6 text-center space-y-2">
+        <div class="text-4xl">👋</div>
+        <h2 class="text-xl font-bold text-blue-900">ยินดีต้อนรับสู่ระบบตรวจคัดกรอง</h2>
+        <p class="text-sm text-gray-500">เลือกรูปแบบการทดสอบที่เหมาะกับอุปกรณ์ของคุณ</p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4">
+        <button onclick="selectMode('mobile')"
+            class="card p-5 text-left hover:border-teal-500 hover:shadow-md border-2 border-transparent transition-all group">
+            <div class="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center text-2xl text-teal-600 group-hover:bg-teal-600 group-hover:text-white transition-all mb-3">
+                <i class="fa-solid fa-mobile-screen"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 mb-1">สมาร์ทโฟน</h3>
+            <p class="text-xs text-slate-500">นิ้วชี้ + นิ้วกลาง แตะหน้าจอสลับกัน ทดสอบทีละมือ</p>
+        </button>
+
+        <button onclick="selectMode('pc')"
+            class="card p-5 text-left hover:border-blue-500 hover:shadow-md border-2 border-transparent transition-all group">
+            <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-2xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all mb-3">
+                <i class="fa-solid fa-keyboard"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 mb-1">คีย์บอร์ด</h3>
+            <p class="text-xs text-slate-500">นิ้วชี้สองข้าง กดปุ่ม F และ K สลับกัน บนแป้นพิมพ์</p>
+        </button>
+
+        <button onclick="selectMode('dual')"
+            class="card p-5 text-left hover:border-indigo-500 hover:shadow-md border-2 border-transparent transition-all group">
+            <div class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-2xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all mb-3">
+                <i class="fa-solid fa-link"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 mb-1">ทั้งสองอุปกรณ์</h3>
+            <p class="text-xs text-slate-500">ความแม่นยำสูงสุด ทดสอบทั้งคีย์บอร์ดและหน้าจอสัมผัส</p>
+        </button>
+    </div>
+
+    <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-xl">
+        <div class="flex gap-3 items-start">
+            <i class="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5"></i>
+            <div>
+                <p class="text-xs font-bold text-amber-800">ข้อควรทราบ</p>
+                <p class="text-xs text-amber-700 mt-0.5">เครื่องมือนี้เป็นระบบคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ SCREEN: SYNC ══════════════ -->
+<div id="screen-sync" class="screen">
+    <div class="card p-6 space-y-6">
+        <div class="text-center space-y-1">
+            <h2 class="text-lg font-bold text-blue-900 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-link text-teal-500"></i> เชื่อมต่อสมาร์ทโฟน
+            </h2>
+            <p class="text-sm text-gray-500">สแกน QR Code ด้วยสมาร์ทโฟนเพื่อทดสอบฝั่งหน้าจอสัมผัส</p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6 items-center">
+            <div class="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center gap-3 bg-slate-50">
+                <div class="bg-white p-3 rounded-xl shadow border border-gray-100 relative">
+                    <i class="fa-solid fa-qrcode text-6xl text-slate-800"></i>
+                    <div class="absolute inset-0 border-2 border-teal-400 rounded-xl animate-pulse"></div>
+                </div>
+                <span class="text-xs font-mono text-slate-400">SYNC-ID: <span class="text-slate-600 font-bold">993A-FK</span></span>
+            </div>
+
+            <div class="space-y-3">
+                <p class="text-xs font-bold text-slate-600">สถานะอุปกรณ์</p>
+                <div class="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs">
+                    <span class="flex items-center gap-2 text-slate-600"><i class="fa-solid fa-desktop"></i> คอมพิวเตอร์</span>
+                    <span class="font-bold text-emerald-700 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>พร้อม</span>
+                </div>
+                <div id="sync-mobile-card" class="flex items-center justify-between bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs transition-all">
+                    <span class="flex items-center gap-2 text-slate-600"><i class="fa-solid fa-mobile-screen"></i> สมาร์ทโฟน</span>
+                    <span id="sync-status" class="font-bold text-amber-700 flex items-center gap-1.5 pulse-dot"><span class="w-2 h-2 rounded-full bg-amber-400"></span>รอสแกน...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-between pt-2 border-t border-slate-100">
+            <button onclick="cancelProcess()" class="text-xs text-slate-400 hover:text-slate-700 px-4 py-2 rounded-lg font-bold">
+                <i class="fa-solid fa-arrow-left mr-1"></i> ยกเลิก
+            </button>
+            <button onclick="simulateMobileSync()" class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all">
+                จำลองสแกนสำเร็จ <i class="fa-solid fa-forward ml-1"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ SCREEN: TEST ══════════════ -->
+<div id="screen-test" class="screen space-y-4">
+
+    <!-- Phase Stepper -->
+    <div class="card px-5 py-3">
+        <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold text-slate-500" id="phase-label">ขั้นที่ 1 / 2</span>
+            <span class="text-xs text-slate-400" id="mode-label"></span>
+        </div>
+        <div class="flex items-center gap-1" id="phase-stepper"></div>
+    </div>
+
+    <!-- PHASE A: PREP -->
+    <div id="phase-prep" class="card p-6 space-y-5">
+        <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-5 text-center space-y-3">
+            <div id="prep-icon" class="text-4xl text-indigo-400"></div>
+            <h3 id="prep-title" class="text-lg font-bold text-indigo-900"></h3>
+            <p id="prep-desc" class="text-sm text-indigo-700 leading-relaxed"></p>
+        </div>
+        <button onclick="startWarmup()"
+            class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 rounded-xl text-base shadow-md transition-all">
+            <i class="fa-solid fa-play mr-2"></i> เริ่มทดสอบ
+        </button>
+    </div>
+
+    <!-- PHASE B: WARMUP -->
+    <div id="phase-warmup" class="card p-6 space-y-5 hidden">
+        <div class="flex items-center justify-between">
+            <div>
+                <span class="badge bg-amber-100 text-amber-700">
+                    <i class="fa-solid fa-fire-flame-curved"></i> Warm-up · ปรับเทียบอุปกรณ์
+                </span>
+                <p class="text-xs text-slate-400 mt-1.5">กดสลับตามจังหวะปกติ ระบบกำลังเรียนรู้ฐานข้อมูลอุปกรณ์ของคุณ</p>
+            </div>
+            <div class="text-right">
+                <span class="text-2xl font-mono font-bold text-amber-500" id="warmup-timer">30</span>
+                <div class="text-xs text-slate-400">วินาที</div>
+            </div>
+        </div>
+
+        <!-- Arc Progress -->
+        <div class="flex justify-center">
+            <svg width="160" height="90" viewBox="0 0 160 90">
+                <path d="M 15 85 A 65 65 0 0 1 145 85" fill="none" stroke="#E2E8F0" stroke-width="10" stroke-linecap="round"/>
+                <path id="warmup-arc" d="M 15 85 A 65 65 0 0 1 145 85" fill="none" stroke="#F59E0B" stroke-width="10" stroke-linecap="round"
+                      stroke-dasharray="204" stroke-dashoffset="0"/>
+            </svg>
+        </div>
+
+        <div id="warmup-input-area" class="flex justify-center gap-6"></div>
+
+        <div class="flex items-center justify-between text-xs bg-slate-50 rounded-xl p-3 border border-slate-100">
+            <span class="text-slate-500">จำนวนครั้ง</span>
+            <span class="font-mono font-bold text-amber-600 text-lg" id="warmup-count">0</span>
+        </div>
+
+        <!-- Live calibration preview -->
+        <div id="calib-preview" class="hidden bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-2">
+            <p class="text-xs font-bold text-blue-700">📊 ข้อมูลที่กำลังเรียนรู้ (Calibration)</p>
+            <div class="grid grid-cols-2 gap-2">
+                <div class="bg-white rounded-lg p-2 text-center border border-blue-100">
+                    <div class="text-base font-mono font-bold text-blue-700" id="calib-ht">-- ms</div>
+                    <div class="text-xs text-slate-400">Hold Time เฉลี่ย</div>
+                </div>
+                <div class="bg-white rounded-lg p-2 text-center border border-blue-100">
+                    <div class="text-base font-mono font-bold text-blue-700" id="calib-ft">-- ms</div>
+                    <div class="text-xs text-slate-400">Flight Time เฉลี่ย</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHASE C: TEST ACTIVE -->
+    <div id="phase-active" class="card p-6 space-y-5 hidden">
+        <div class="flex items-center justify-between">
+            <div>
+                <span class="badge bg-teal-100 text-teal-700">
+                    <i class="fa-solid fa-circle-dot pulse-dot"></i> กำลังบันทึก
+                </span>
+                <p class="text-xs text-slate-400 mt-1.5" id="active-desc">กดปุ่มสลับให้สม่ำเสมอที่สุด</p>
+            </div>
+            <div class="text-right">
+                <span class="text-2xl font-mono font-bold text-teal-600" id="test-timer">15</span>
+                <div class="text-xs text-slate-400">วินาที</div>
+            </div>
+        </div>
+
+        <!-- Arc Progress -->
+        <div class="flex justify-center">
+            <svg width="160" height="90" viewBox="0 0 160 90">
+                <path d="M 15 85 A 65 65 0 0 1 145 85" fill="none" stroke="#E2E8F0" stroke-width="10" stroke-linecap="round"/>
+                <path id="test-arc" d="M 15 85 A 65 65 0 0 1 145 85" fill="none" stroke="#0D9488" stroke-width="10" stroke-linecap="round"
+                      stroke-dasharray="204" stroke-dashoffset="0"/>
+            </svg>
+        </div>
+
+        <div id="active-input-area" class="flex justify-center gap-6"></div>
+
+        <!-- Live stats -->
+        <div class="grid grid-cols-3 gap-2">
+            <div class="bg-slate-50 rounded-xl p-2.5 text-center border border-slate-100">
+                <div class="text-base font-mono font-bold text-teal-600" id="live-count">0</div>
+                <div class="text-xs text-slate-400">ครั้ง</div>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-2.5 text-center border border-slate-100">
+                <div class="text-base font-mono font-bold text-blue-600" id="live-ht">-- ms</div>
+                <div class="text-xs text-slate-400">Hold Time</div>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-2.5 text-center border border-slate-100">
+                <div class="text-base font-mono font-bold text-indigo-600" id="live-ft">-- ms</div>
+                <div class="text-xs text-slate-400">Flight Time</div>
+            </div>
+        </div>
+
+        <!-- Rhythm visualizer -->
+        <div class="bg-slate-50 border border-slate-100 rounded-xl p-3">
+            <p class="text-xs text-slate-400 mb-2 font-bold">จังหวะการกด (Live)</p>
+            <div class="flex items-end gap-1 h-10" id="rhythm-bars">
+                <div class="text-xs text-slate-300 italic">รอข้อมูล...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHASE D: PROCESSING -->
+    <div id="phase-processing" class="card p-8 text-center space-y-4 hidden">
+        <div class="w-14 h-14 bg-teal-50 rounded-full flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-microchip text-teal-600 text-2xl animate-spin"></i>
+        </div>
+        <div>
+            <h3 class="font-bold text-slate-700">AI กำลังประมวลผล...</h3>
+            <p class="text-xs text-slate-400 mt-1" id="processing-detail">คำนวณ Features และ Calibration</p>
+        </div>
+        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+            <div id="proc-bar" class="bg-teal-500 h-full rounded-full w-0 transition-all duration-300"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ══════════════ SCREEN: DASHBOARD ══════════════ -->
+<div id="screen-dashboard" class="screen space-y-5">
+
+    <!-- Hero Card -->
+    <div class="card bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 flex flex-col sm:flex-row items-center gap-6">
+        <div class="flex-1 space-y-2 text-center sm:text-left">
+            <div class="badge bg-white/10 text-slate-300 border border-white/10">
+                <i class="fa-solid fa-file-medical text-teal-400"></i> รายงานผลการคัดกรอง
+            </div>
+            <h2 class="text-2xl font-bold">Parkinson's Risk Report</h2>
+            <p class="text-sm text-slate-400" id="dash-mode-text"></p>
+        </div>
+
+        <!-- Risk Ring -->
+        <div class="relative flex-shrink-0">
+            <svg width="130" height="130" viewBox="0 0 130 130">
+                <circle cx="65" cy="65" r="56" fill="none" stroke="#334155" stroke-width="10"/>
+                <circle id="risk-ring" cx="65" cy="65" r="56" fill="none" stroke="#10B981" stroke-width="10"
+                        stroke-dasharray="351.858" stroke-dashoffset="351.858"
+                        transform="rotate(-90 65 65)" class="risk-ring-fill"/>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <span id="risk-pct" class="text-3xl font-bold text-white">0%</span>
+                <span class="text-xs text-slate-400 mt-0.5">ความเสี่ยง</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid md:grid-cols-5 gap-4">
+
+        <!-- XAI Panel -->
+        <div class="md:col-span-3 card p-5 space-y-4">
+            <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2 border-b border-slate-100 pb-2">
+                <i class="fa-solid fa-magnifying-glass-chart text-indigo-500"></i> การแปลผล (Explainable AI)
+            </h3>
+
+            <div id="xai-verdict" class="border-l-4 border-teal-400 bg-teal-50 p-3 rounded-r-xl">
+                <p id="xai-title" class="font-bold text-teal-800 text-sm"></p>
+                <p id="xai-desc" class="text-xs text-teal-700 mt-1 leading-relaxed"></p>
+            </div>
+
+            <!-- XAI Feature Bars -->
+            <div class="space-y-3" id="xai-bars"></div>
+
+            <!-- Calibration info -->
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 space-y-1">
+                <p class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-sliders"></i> Calibration Applied</p>
+                <div class="grid grid-cols-2 gap-2 mt-1">
+                    <div class="bg-white rounded-lg p-2 border border-blue-100 text-center">
+                        <div class="font-mono font-bold" id="calib-ratio-ht">--</div>
+                        <div class="text-slate-400">HT Ratio</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-2 border border-blue-100 text-center">
+                        <div class="font-mono font-bold" id="calib-ratio-ft">--</div>
+                        <div class="text-slate-400">FT Ratio</div>
+                    </div>
+                </div>
+                <p class="text-slate-400 mt-1">ใช้ RatioNormalizer แก้ hardware bias ก่อนส่ง model</p>
+            </div>
+        </div>
+
+        <!-- Radar + Actions -->
+        <div class="md:col-span-2 flex flex-col gap-4">
+            <div class="card p-4 flex-grow">
+                <h4 class="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-nodes text-emerald-500"></i> เรดาร์สรีรวิทยา
+                </h4>
+                <div class="w-full" style="height:180px">
+                    <canvas id="radarChart"></canvas>
+                </div>
+            </div>
+
+            <button onclick="simulatePDF()"
+                class="card p-3.5 flex items-center justify-center gap-2 text-rose-600 hover:bg-rose-50 text-sm font-bold border-rose-100 transition-all cursor-pointer">
+                <i class="fa-solid fa-file-pdf text-rose-500"></i> ดาวน์โหลด PDF
+            </button>
+
+            <button onclick="cancelProcess()"
+                class="card p-3.5 flex items-center justify-center gap-2 text-slate-500 hover:bg-slate-50 text-sm font-bold transition-all cursor-pointer">
+                <i class="fa-solid fa-rotate-left"></i> ทดสอบอีกครั้ง
+            </button>
+        </div>
+    </div>
+
+    <!-- Raw Features Debug -->
+    <div class="card p-4 space-y-2">
+        <button onclick="toggleDebug()" class="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1.5">
+            <i class="fa-solid fa-code"></i> ดูข้อมูล Features ดิบ
+        </button>
+        <div id="debug-panel" class="hidden bg-slate-900 text-green-400 rounded-xl p-4 font-mono text-xs overflow-x-auto">
+            <pre id="debug-json"></pre>
+        </div>
+    </div>
+
+</div>
+
+</main>
+
+<footer class="bg-slate-900 text-slate-500 text-xs text-center py-3 border-t border-slate-800">
+    โครงงานวิจัยคัดกรองสุขภาพดิจิทัลเชิงรุก · Keystroke Dynamics · XGBoost v5 + ONNX
+</footer>
+
+<!-- ══════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════ -->
+<script>
+// ─────────────────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────────────────
+let isAudioOn = false;
+let currentMode = '';
+let testQueue = [];
+let queueIdx = 0;
+let currentTestType = '';
+
+// Timer handles
+let warmupInterval = null;
+let testInterval = null;
+
+// Event logs
+let warmupLog = [];  // { key, action, t }
+let testLog = [];    // { key, action, t }
+
+// Computed calibration baseline (from warmup)
+let calibBaseline = { ht_mean: null, ft_mean: null };
+
+// Aggregated results across queue steps
+let allResults = [];
+
+// Current test tap count
+let tapCount = 0;
+let warmupTapCount = 0;
+
+// Chart instance
+let radarChart = null;
+
+// ─────────────────────────────────────────────────────────
+//  SCREENS
+// ─────────────────────────────────────────────────────────
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+// ─────────────────────────────────────────────────────────
+//  AUDIO
+// ─────────────────────────────────────────────────────────
+function toggleAudio() {
+    isAudioOn = !isAudioOn;
+    document.getElementById('audio-icon').className =
+        isAudioOn ? 'fa-solid fa-volume-high text-teal-300' : 'fa-solid fa-volume-xmark text-slate-400';
+}
+
+// ─────────────────────────────────────────────────────────
+//  MODE SELECT
+// ─────────────────────────────────────────────────────────
+function selectMode(mode) {
+    currentMode = mode;
+    testQueue = [];
+    queueIdx = 0;
+    allResults = [];
+
+    if (mode === 'mobile') {
+        testQueue = ['mobile-left', 'mobile-right'];
+    } else if (mode === 'pc') {
+        testQueue = ['pc'];
+    } else if (mode === 'dual') {
+        testQueue = ['sync', 'pc', 'mobile-left', 'mobile-right'];
+    }
+
+    processNext();
+}
+
+function cancelProcess() {
+    clearAll();
+    showScreen('screen-welcome');
+}
+
+function processNext() {
+    if (queueIdx >= testQueue.length) {
+        renderDashboard();
+        showScreen('screen-dashboard');
+        return;
+    }
+
+    const task = testQueue[queueIdx];
+    if (task === 'sync') {
+        resetSyncUI();
+        showScreen('screen-sync');
+    } else {
+        setupTest(task);
+        showScreen('screen-test');
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+//  SYNC
+// ─────────────────────────────────────────────────────────
+function resetSyncUI() {
+    document.getElementById('sync-status').className = 'font-bold text-amber-700 flex items-center gap-1.5 pulse-dot';
+    document.getElementById('sync-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span>รอสแกน...';
+    document.getElementById('sync-mobile-card').className = 'flex items-center justify-between bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs transition-all';
+}
+
+function simulateMobileSync() {
+    document.getElementById('sync-status').className = 'font-bold text-emerald-700 flex items-center gap-1.5';
+    document.getElementById('sync-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span>เชื่อมต่อแล้ว';
+    document.getElementById('sync-mobile-card').className = 'flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs transition-all';
+    setTimeout(() => { queueIdx++; processNext(); }, 900);
+}
+
+// ─────────────────────────────────────────────────────────
+//  TEST SETUP
+// ─────────────────────────────────────────────────────────
+function setupTest(type) {
+    currentTestType = type;
+    warmupLog = [];
+    testLog = [];
+    calibBaseline = { ht_mean: null, ft_mean: null };
+    tapCount = 0;
+    warmupTapCount = 0;
+
+    // Phase stepper
+    const steps = testQueue.filter(t => t !== 'sync');
+    const stepEl = document.getElementById('phase-stepper');
+    stepEl.innerHTML = '';
+    const stepIdx = steps.indexOf(type);
+    steps.forEach((s, i) => {
+        if (i > 0) stepEl.innerHTML += '<div class="phase-line"></div>';
+        const dot = document.createElement('div');
+        dot.className = 'phase-dot' + (i < stepIdx ? ' done' : i === stepIdx ? ' active' : '');
+        stepEl.appendChild(dot);
+    });
+    document.getElementById('phase-label').innerText = `ขั้นที่ ${stepIdx + 1} / ${steps.length}`;
+    document.getElementById('mode-label').innerText = type === 'pc' ? '⌨️ คีย์บอร์ด' : type === 'mobile-left' ? '📱 มือซ้าย' : '📱 มือขวา';
+
+    // Prep content
+    const icons = { pc: '⌨️', 'mobile-left': '🤚', 'mobile-right': '✋' };
+    const titles = { pc: 'ทดสอบแป้นพิมพ์ F/K', 'mobile-left': 'ทดสอบมือซ้าย', 'mobile-right': 'ทดสอบมือขวา' };
+    const descs  = {
+        pc: 'วางนิ้วชี้มือซ้ายที่ปุ่ม <b>F</b> และนิ้วชี้มือขวาที่ปุ่ม <b>K</b><br>กดสลับกันให้สม่ำเสมอตลอด 15 วินาที',
+        'mobile-left': 'ใช้ <b>นิ้วชี้</b> และ <b>นิ้วกลาง</b> ของมือซ้าย<br>แตะปุ่มทั้งสองสลับกันให้สม่ำเสมอตลอด 15 วินาที',
+        'mobile-right': 'ใช้ <b>นิ้วชี้</b> และ <b>นิ้วกลาง</b> ของมือขวา<br>แตะปุ่มทั้งสองสลับกันให้สม่ำเสมอตลอด 15 วินาที'
+    };
+
+    document.getElementById('prep-icon').innerText = icons[type];
+    document.getElementById('prep-title').innerText = titles[type];
+    document.getElementById('prep-desc').innerHTML = descs[type];
+
+    showPhase('prep');
+}
+
+function showPhase(phase) {
+    ['prep','warmup','active','processing'].forEach(p => {
+        document.getElementById(`phase-${p}`).classList.toggle('hidden', p !== phase);
+    });
+}
+
+// ─────────────────────────────────────────────────────────
+//  WARMUP PHASE (30s)
+// ─────────────────────────────────────────────────────────
+function startWarmup() {
+    showPhase('warmup');
+    warmupLog = [];
+    warmupTapCount = 0;
+    document.getElementById('warmup-count').innerText = '0';
+    document.getElementById('calib-preview').classList.add('hidden');
+    document.getElementById('calib-ht').innerText = '-- ms';
+    document.getElementById('calib-ft').innerText = '-- ms';
+
+    buildInputArea('warmup-input-area', 'warmup');
+
+    let timeLeft = 15;
+    document.getElementById('warmup-timer').innerText = '15';
+    const arc = document.getElementById('warmup-arc');
+    arc.style.strokeDashoffset = '0';
+
+    window._warmupActive = true;
+
+    warmupInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById('warmup-timer').innerText = timeLeft;
+        arc.style.strokeDashoffset = ((15 - timeLeft) / 15 * 204).toString();
+
+        // Show calibration preview after 10 taps
+        if (warmupTapCount >= 6) {
+            updateCalibPreview();
+            document.getElementById('calib-preview').classList.remove('hidden');
+        }
+
+        if (timeLeft <= 0) {
+            clearInterval(warmupInterval);
+            window._warmupActive = false;
+            removeInputListeners();
+            computeCalibBaseline();
+            startTestActive();
+        }
+    }, 1000);
+}
+
+function buildInputArea(containerId, phase) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+
+    if (currentTestType === 'pc') {
+        container.innerHTML = `
+            <div id="${phase}-btn-f" class="key-btn" data-key="f">F</div>
+            <div id="${phase}-btn-k" class="key-btn" data-key="k">K</div>
+        `;
+        window.addEventListener('keydown', phase === 'warmup' ? handleWarmupKeyDown : handleTestKeyDown);
+        window.addEventListener('keyup',   phase === 'warmup' ? handleWarmupKeyUp   : handleTestKeyUp);
+    } else {
+        container.innerHTML = `
+            <div id="${phase}-btn-left" class="touch-btn">
+                <div class="finger-ring"></div>
+                <span>นิ้วชี้</span>
+            </div>
+            <div id="${phase}-btn-right" class="touch-btn">
+                <div class="finger-ring"></div>
+                <span>นิ้วกลาง</span>
+            </div>
+        `;
+        const L = document.getElementById(`${phase}-btn-left`);
+        const R = document.getElementById(`${phase}-btn-right`);
+        const handler = phase === 'warmup' ? handleWarmupTouch : handleTestTouch;
+        L.addEventListener('touchstart', e => handler(e, 'left', 'down'), { passive: false });
+        L.addEventListener('touchend',   e => handler(e, 'left', 'up'),   { passive: false });
+        R.addEventListener('touchstart', e => handler(e, 'right', 'down'), { passive: false });
+        R.addEventListener('touchend',   e => handler(e, 'right', 'up'),   { passive: false });
+
+        // mouse fallback for desktop testing
+        L.addEventListener('mousedown', e => handler(e, 'left', 'down'));
+        L.addEventListener('mouseup',   e => handler(e, 'left', 'up'));
+        R.addEventListener('mousedown', e => handler(e, 'right', 'down'));
+        R.addEventListener('mouseup',   e => handler(e, 'right', 'up'));
+    }
+}
+
+function removeInputListeners() {
+    window.removeEventListener('keydown', handleWarmupKeyDown);
+    window.removeEventListener('keyup',   handleWarmupKeyUp);
+    window.removeEventListener('keydown', handleTestKeyDown);
+    window.removeEventListener('keyup',   handleTestKeyUp);
+}
+
+// ── Warmup event handlers ──
+function handleWarmupKeyDown(e) {
+    if (!window._warmupActive || e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (k !== 'f' && k !== 'k') return;
+    warmupLog.push({ key: k, action: 'down', t: performance.now() });
+    const btn = document.getElementById(`warmup-btn-${k}`);
+    if (btn) { btn.classList.add('warmup'); }
+    warmupTapCount++;
+    document.getElementById('warmup-count').innerText = warmupTapCount;
+}
+function handleWarmupKeyUp(e) {
+    if (!window._warmupActive) return;
+    const k = e.key.toLowerCase();
+    if (k !== 'f' && k !== 'k') return;
+    warmupLog.push({ key: k, action: 'up', t: performance.now() });
+    const btn = document.getElementById(`warmup-btn-${k}`);
+    if (btn) btn.classList.remove('warmup');
+}
+function handleWarmupTouch(e, side, action) {
+    e.preventDefault();
+    if (!window._warmupActive) return;
+    warmupLog.push({ key: side, action: action === 'down' ? 'down' : 'up', t: performance.now() });
+    const btn = document.getElementById(`warmup-btn-${side}`);
+    if (action === 'down') {
+        if (btn) btn.classList.add('pressed');
+        warmupTapCount++;
+        document.getElementById('warmup-count').innerText = warmupTapCount;
+    } else {
+        if (btn) btn.classList.remove('pressed');
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+//  CALIBRATION: compute baseline from warmup log
+// ─────────────────────────────────────────────────────────
+function computeCalibBaseline() {
+    const pairs = extractHtFt(warmupLog);
+    if (pairs.ht.length === 0) {
+        calibBaseline = { ht_mean: 120, ft_mean: 80 }; // safe defaults
+        return;
+    }
+    calibBaseline.ht_mean = mean(pairs.ht);
+    calibBaseline.ft_mean = pairs.ft.length > 0 ? mean(pairs.ft) : 80;
+}
+
+function updateCalibPreview() {
+    const pairs = extractHtFt(warmupLog);
+    if (pairs.ht.length > 0) {
+        document.getElementById('calib-ht').innerText = mean(pairs.ht).toFixed(1) + ' ms';
+        document.getElementById('calib-ft').innerText = pairs.ft.length > 0 ? mean(pairs.ft).toFixed(1) + ' ms' : '--';
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+//  TEST ACTIVE PHASE (15s)
+// ─────────────────────────────────────────────────────────
+function startTestActive() {
+    showPhase('active');
+    testLog = [];
+    tapCount = 0;
+    document.getElementById('live-count').innerText = '0';
+    document.getElementById('live-ht').innerText = '-- ms';
+    document.getElementById('live-ft').innerText = '-- ms';
+    document.getElementById('rhythm-bars').innerHTML = '<div class="text-xs text-slate-300 italic">รอข้อมูล...</div>';
+    document.getElementById('active-desc').innerText =
+        currentTestType === 'pc' ? 'กดปุ่ม F และ K สลับกันให้สม่ำเสมอ' : 'แตะปุ่มสลับกันให้สม่ำเสมอ';
+
+    buildInputArea('active-input-area', 'test');
+
+    let timeLeft = 15;
+    document.getElementById('test-timer').innerText = '15';
+    const arc = document.getElementById('test-arc');
+    arc.style.strokeDashoffset = '0';
+
+    window._testActive = true;
+
+    testInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById('test-timer').innerText = timeLeft;
+        arc.style.strokeDashoffset = ((15 - timeLeft) / 15 * 204).toString();
+        updateLiveStats();
+
+        if (timeLeft <= 0) {
+            clearInterval(testInterval);
+            window._testActive = false;
+            removeInputListeners();
+            finishTest();
+        }
+    }, 1000);
+}
+
+// ── Test event handlers ──
+function handleTestKeyDown(e) {
+    if (!window._testActive || e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (k !== 'f' && k !== 'k') return;
+    testLog.push({ key: k, action: 'down', t: performance.now() });
+    const btn = document.getElementById(`test-btn-${k}`);
+    if (btn) btn.classList.add(k === 'f' ? 'pressed-f' : 'pressed-k');
+    tapCount++;
+    document.getElementById('live-count').innerText = tapCount;
+}
+function handleTestKeyUp(e) {
+    if (!window._testActive) return;
+    const k = e.key.toLowerCase();
+    if (k !== 'f' && k !== 'k') return;
+    testLog.push({ key: k, action: 'up', t: performance.now() });
+    const btn = document.getElementById(`test-btn-${k}`);
+    if (btn) { btn.classList.remove('pressed-f', 'pressed-k'); }
+}
+function handleTestTouch(e, side, action) {
+    e.preventDefault();
+    if (!window._testActive) return;
+    testLog.push({ key: side, action: action === 'down' ? 'down' : 'up', t: performance.now() });
+    const btn = document.getElementById(`test-btn-${side}`);
+    if (action === 'down') {
+        if (btn) btn.classList.add('pressed');
+        tapCount++;
+        document.getElementById('live-count').innerText = tapCount;
+    } else {
+        if (btn) btn.classList.remove('pressed');
+    }
+}
+
+function updateLiveStats() {
+    const pairs = extractHtFt(testLog);
+    if (pairs.ht.length > 2) {
+        document.getElementById('live-ht').innerText = mean(pairs.ht).toFixed(1) + ' ms';
+    }
+    if (pairs.ft.length > 2) {
+        document.getElementById('live-ft').innerText = mean(pairs.ft).toFixed(1) + ' ms';
+    }
+    renderRhythmBars(pairs.ht.slice(-16));
+}
+
+function renderRhythmBars(htArr) {
+    if (htArr.length < 2) return;
+    const maxH = Math.max(...htArr) || 1;
+    const container = document.getElementById('rhythm-bars');
+    container.innerHTML = '';
+    htArr.forEach(v => {
+        const bar = document.createElement('div');
+        bar.className = 'rhythm-bar';
+        bar.style.height = Math.max(4, (v / maxH) * 36) + 'px';
+        bar.style.background = '#0D9488';
+        container.appendChild(bar);
+    });
+}
+
+// ─────────────────────────────────────────────────────────
+//  FINISH TEST → COMPUTE FEATURES → PUSH TO BACKEND
+// ─────────────────────────────────────────────────────────
+async function finishTest() {
+    showPhase('processing');
+    animateProcessBar();
+
+    const rawFeatures = computeFeatures(testLog);
+    const calibFeatures = applyRatioNormalizer(rawFeatures);
+    const { ht, ft } = extractHtFt(testLog);
+
+    let stepResult = {
+        test_type: currentTestType,
+        tap_count: tapCount,
+        raw_features: rawFeatures,
+        calibrated_features: calibFeatures,
+        calib_baseline: calibBaseline,
+        risk_probability: null,
+        radar: null,
+    };
+
+    try {
+        const resp = await fetch('parkinson-backend-production-6af7.up.railway.app/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            
+            body: JSON.stringify({
+    test_type: currentTestType,
+    device: currentMode,
+    ht_array_ms: ht,              // ← เพิ่ม
+    ft_array_ms: ft,              // ← เพิ่ม
+    calib_baseline: calibBaseline,
+    calibrated_features: calibFeatures,
+    raw_features: rawFeatures,
+    tap_count: tapCount
+})
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.status === 'success') {
+                stepResult.risk_probability = data.analysis.risk_percentage;
+                stepResult.radar = data.analysis.radar_metrics;
+                stepResult.xai_title = data.analysis.risk_level;
+                stepResult.xai_desc  = data.analysis.xai_explanation;
+            }
+        }
+    } catch (_) {
+        // Backend not running — use mock
+        stepResult.risk_probability = mockRisk(calibFeatures);
+        stepResult.radar = mockRadar(calibFeatures);
+    }
+
+    allResults.push(stepResult);
+    queueIdx++;
+    setTimeout(() => processNext(), 600);
+}
+
+// ─────────────────────────────────────────────────────────
+//  FEATURE ENGINEERING (JS)
+// ─────────────────────────────────────────────────────────
+function extractHtFt(log) {
+    const ht = [], ft = [];
+    const keys = [...new Set(log.map(e => e.key))];
+    keys.forEach(k => {
+        const events = log.filter(e => e.key === k);
+        for (let i = 0; i < events.length - 1; i++) {
+            if (events[i].action === 'down' && events[i+1].action === 'up') {
+                const h = events[i+1].t - events[i].t;
+                if (h > 0 && h < 500) ht.push(h);
+            }
+        }
+    });
+    // Flight time: between up of one key and down of another
+    const downs = log.filter(e => e.action === 'down').sort((a,b) => a.t - b.t);
+    const ups   = log.filter(e => e.action === 'up').sort((a,b) => a.t - b.t);
+    for (let i = 0; i < Math.min(downs.length, ups.length) - 1; i++) {
+        const f = downs[i+1].t - ups[i].t;
+        if (f > 0 && f < 800) ft.push(f);
+    }
+    return { ht, ft };
+}
+
+function mean(arr) { return arr.reduce((a,b) => a+b, 0) / arr.length; }
+function std(arr) {
+    const m = mean(arr);
+    return Math.sqrt(arr.reduce((a,b) => a + (b-m)**2, 0) / arr.length);
+}
+function cv(arr) { const m = mean(arr); return m > 0 ? std(arr) / m : 0; }
+function percentile(arr, p) {
+    const s = [...arr].sort((a,b) => a-b);
+    const idx = (p/100) * (s.length - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    return s[lo] + (s[hi] - s[lo]) * (idx - lo);
+}
+
+function computeFeatures(log) {
+    const { ht, ft } = extractHtFt(log);
+    if (ht.length < 4) return {};
+
+    const allIKI = [];
+    const downs = log.filter(e => e.action === 'down').sort((a,b) => a.t - b.t);
+    for (let i = 1; i < downs.length; i++) allIKI.push(downs[i].t - downs[i-1].t);
+
+    const rmssd = () => {
+        let s = 0;
+        for (let i = 1; i < ht.length; i++) s += (ht[i] - ht[i-1])**2;
+        return Math.sqrt(s / (ht.length - 1));
+    };
+
+    return {
+        ht_mean:   mean(ht),
+        ht_std:    std(ht),
+        ht_cv:     cv(ht),
+        ht_p10:    ht.length > 4 ? percentile(ht, 10) : null,
+        ht_p90:    ht.length > 4 ? percentile(ht, 90) : null,
+        ft_mean:   ft.length > 0 ? mean(ft) : null,
+        ft_std:    ft.length > 0 ? std(ft) : null,
+        ft_cv:     ft.length > 0 ? cv(ft) : null,
+        iki_mean:  allIKI.length > 0 ? mean(allIKI) : null,
+        iki_std:   allIKI.length > 0 ? std(allIKI) : null,
+        rmssd:     ht.length > 2 ? rmssd() : null,
+        tap_count: tapCount,
+        duration_s: log.length > 0 ? (log[log.length-1].t - log[0].t) / 1000 : null,
+    };
+}
+
+// ─────────────────────────────────────────────────────────
+//  CALIBRATION: RatioNormalizer
+//  Converts absolute ms values → ratios relative to warmup baseline
+//  Neutralizes hardware polling rate / timer precision bias
+// ─────────────────────────────────────────────────────────
+function applyRatioNormalizer(features) {
+    if (!calibBaseline.ht_mean || calibBaseline.ht_mean === 0) return features;
+
+    const htB = calibBaseline.ht_mean;
+    const ftB = calibBaseline.ft_mean || features.ft_mean || 80;
+
+    const calibrated = { ...features };
+
+    // Convert HT values to ratios
+    if (features.ht_mean   != null) calibrated.ht_mean   = features.ht_mean   / htB;
+    if (features.ht_std    != null) calibrated.ht_std    = features.ht_std    / htB;
+    if (features.ht_p10    != null) calibrated.ht_p10    = features.ht_p10    / htB;
+    if (features.ht_p90    != null) calibrated.ht_p90    = features.ht_p90    / htB;
+    // CV is already ratio — no change
+    if (features.ft_mean   != null) calibrated.ft_mean   = features.ft_mean   / ftB;
+    if (features.ft_std    != null) calibrated.ft_std    = features.ft_std    / ftB;
+    if (features.rmssd     != null) calibrated.rmssd     = features.rmssd     / htB;
+
+    calibrated._calib_applied = true;
+    calibrated._ht_ratio      = features.ht_mean ? (features.ht_mean / htB).toFixed(3) : null;
+    calibrated._ft_ratio      = features.ft_mean ? (features.ft_mean / ftB).toFixed(3) : null;
+    calibrated._ht_baseline   = htB;
+    calibrated._ft_baseline   = ftB;
+
+    return calibrated;
+}
+
+// ─────────────────────────────────────────────────────────
+//  MOCK RISK (used when backend is offline)
+// ─────────────────────────────────────────────────────────
+function mockRisk(f) {
+    let score = 10;
+    if (f.ht_cv  != null && f.ht_cv  > 0.25) score += 20;
+    if (f.ft_cv  != null && f.ft_cv  > 0.35) score += 15;
+    if (f.rmssd  != null && f.rmssd  > 30)   score += 10;
+    if (f.iki_std != null && f.iki_std > 50)  score += 10;
+    if (f._ht_ratio != null && Math.abs(parseFloat(f._ht_ratio) - 1) > 0.3) score += 5;
+    return Math.min(score + Math.floor(Math.random() * 8), 95);
+}
+
+function mockRadar(f) {
+    const rhythm = f.ht_cv != null ? Math.max(10, 100 - f.ht_cv * 300) : 70;
+    const speed  = f.iki_mean != null ? Math.max(10, 100 - f.iki_mean / 5) : 65;
+    const force  = f.ht_mean != null ? Math.min(95, 50 + (1 - Math.min(f.ht_mean, 200) / 200) * 50) : 70;
+    const lsym   = f.ft_cv != null ? Math.max(10, 100 - f.ft_cv * 250) : 75;
+    const rsym   = lsym + (Math.random() - 0.5) * 10;
+    return [
+        Math.round(Math.min(99, Math.max(5, rhythm))),
+        Math.round(Math.min(99, Math.max(5, speed))),
+        Math.round(Math.min(99, Math.max(5, force))),
+        Math.round(Math.min(99, Math.max(5, lsym))),
+        Math.round(Math.min(99, Math.max(5, rsym))),
+    ];
+}
+
+// ─────────────────────────────────────────────────────────
+//  PROCESSING BAR ANIMATION
+// ─────────────────────────────────────────────────────────
+function animateProcessBar() {
+    const bar = document.getElementById('proc-bar');
+    const steps = [
+        [300, 20, 'สกัด Features จาก eventLog...'],
+        [600, 45, 'ใช้ RatioNormalizer (Calibration)...'],
+        [900, 65, 'ส่ง features ไปยัง Backend...'],
+        [1200, 85, 'รอผลจาก XGBoost Model...'],
+        [1500, 100, 'เสร็จสิ้น ✓'],
+    ];
+    steps.forEach(([delay, pct, msg]) => {
+        setTimeout(() => {
+            bar.style.width = pct + '%';
+            document.getElementById('processing-detail').innerText = msg;
+        }, delay);
+    });
+}
+
+// ─────────────────────────────────────────────────────────
+//  DASHBOARD
+// ─────────────────────────────────────────────────────────
+function renderDashboard() {
+    // Aggregate results
+    const risks = allResults.map(r => r.risk_probability).filter(v => v != null);
+    const avgRisk = risks.length > 0 ? Math.round(risks.reduce((a,b) => a+b,0) / risks.length) : 18;
+
+    // Last result with radar
+    const lastWithRadar = [...allResults].reverse().find(r => r.radar);
+    const radar = lastWithRadar ? lastWithRadar.radar : [75, 68, 80, 72, 70];
+
+    // Calib ratios (last result)
+    const lastCalib = allResults[allResults.length - 1]?.calibrated_features;
+    document.getElementById('calib-ratio-ht').innerText = lastCalib?._ht_ratio ?? '--';
+    document.getElementById('calib-ratio-ft').innerText = lastCalib?._ft_ratio ?? '--';
+
+    // Mode label
+    const modeLabels = { pc: 'คีย์บอร์ด', mobile: 'สมาร์ทโฟน', dual: 'คีย์บอร์ด + สมาร์ทโฟน' };
+    document.getElementById('dash-mode-text').innerText = `โหมด: ${modeLabels[currentMode] || currentMode} · ${allResults.length} การทดสอบ`;
+
+    // Risk ring
+    const ring = document.getElementById('risk-ring');
+    const circ = 351.858;
+    let ringColor = '#10B981';
+    if (avgRisk >= 50) ringColor = '#EF4444';
+    else if (avgRisk >= 25) ringColor = '#F59E0B';
+    ring.style.stroke = ringColor;
+
+    setTimeout(() => {
+        ring.style.strokeDashoffset = (circ - (avgRisk / 100) * circ).toString();
+        let c = 0;
+        const el = document.getElementById('risk-pct');
+        const t = setInterval(() => {
+            c++;
+            el.innerText = c + '%';
+            if (c >= avgRisk) { el.innerText = avgRisk + '%'; clearInterval(t); }
+        }, 20);
+    }, 300);
+
+    // XAI verdict
+    let verdict, verdictTitle, verdictColor;
+    if (avgRisk < 20) {
+        verdictTitle = '✅ ความเสี่ยงต่ำ — ผลปกติ';
+        verdict = 'รูปแบบการกดแป้นพิมพ์อยู่ในเกณฑ์ปกติ ความสม่ำเสมอและความสมมาตรซ้าย-ขวาดี ไม่พบสัญญาณผิดปกติ';
+        verdictColor = 'border-emerald-400 bg-emerald-50';
+    } else if (avgRisk < 50) {
+        verdictTitle = '⚠️ ความเสี่ยงปานกลาง — แนะนำติดตาม';
+        verdict = 'พบความแปรปรวนในจังหวะการกดปุ่มสูงกว่าค่าเฉลี่ยเล็กน้อย แนะนำทำการทดสอบซ้ำในอีก 2-4 สัปดาห์ และปรึกษาแพทย์หากสงสัย';
+        verdictColor = 'border-amber-400 bg-amber-50';
+    } else {
+        verdictTitle = '🔴 ความเสี่ยงสูง — ควรพบแพทย์';
+        verdict = 'พบรูปแบบที่บ่งชี้ถึงความผิดปกติของการควบคุมกล้ามเนื้อมัดเล็ก ควรนัดพบแพทย์ประสาทวิทยาเพื่อการตรวจวินิจฉัยที่ถูกต้อง';
+        verdictColor = 'border-rose-400 bg-rose-50';
+    }
+
+    // Override with API data if available
+    const apiResult = allResults.find(r => r.xai_title);
+    if (apiResult) {
+        document.getElementById('xai-title').innerText = apiResult.xai_title;
+        document.getElementById('xai-desc').innerText  = apiResult.xai_desc;
+    } else {
+        document.getElementById('xai-title').innerText = verdictTitle;
+        document.getElementById('xai-desc').innerText  = verdict;
+    }
+    document.getElementById('xai-verdict').className = `border-l-4 p-3 rounded-r-xl ${verdictColor}`;
+    document.getElementById('xai-title').className   = `font-bold text-sm ${avgRisk < 20 ? 'text-emerald-800' : avgRisk < 50 ? 'text-amber-800' : 'text-rose-800'}`;
+    document.getElementById('xai-desc').className    = `text-xs mt-1 leading-relaxed ${avgRisk < 20 ? 'text-emerald-700' : avgRisk < 50 ? 'text-amber-700' : 'text-rose-700'}`;
+
+    // XAI Feature bars
+    const features = [
+        { label: 'ความสม่ำเสมอจังหวะ (HT CV)', val: radar[0], color: avgRisk < 25 ? '#10B981' : avgRisk < 50 ? '#F59E0B' : '#EF4444' },
+        { label: 'ความเร็วเฉลี่ย (IKI)', val: radar[1], color: '#3B82F6' },
+        { label: 'ความสมมาตร ซ้าย-ขวา', val: Math.round((radar[3]+radar[4])/2), color: '#8B5CF6' },
+        { label: 'ความสม่ำเสมอ Flight Time', val: radar[2], color: '#F59E0B' },
+    ];
+    const xaiBarsEl = document.getElementById('xai-bars');
+    xaiBarsEl.innerHTML = '';
+    features.forEach(f => {
+        const label = f.val >= 70 ? 'ปกติ' : f.val >= 45 ? 'ปานกลาง' : 'ผิดปกติ';
+        xaiBarsEl.innerHTML += `
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1.5">
+                <div class="flex justify-between text-xs font-bold">
+                    <span class="text-slate-600">${f.label}</span>
+                    <span style="color:${f.color}">${label} (${f.val}%)</span>
+                </div>
+                <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div class="xai-bar" style="width:${f.val}%;background:${f.color}"></div>
+                </div>
+            </div>`;
+    });
+
+    // Radar chart
+    if (radarChart) radarChart.destroy();
+    const ctx = document.getElementById('radarChart').getContext('2d');
+    radarChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['จังหวะ', 'ความเร็ว', 'แรง(ประมาณ)', 'สมมาตรซ้าย', 'สมมาตรขวา'],
+            datasets: [
+                {
+                    label: 'ค่าเฉลี่ยปกติ',
+                    data: [90, 85, 80, 88, 88],
+                    backgroundColor: 'rgba(148,163,184,0.15)',
+                    borderColor: 'rgba(148,163,184,0.8)',
+                    borderWidth: 1.5,
+                    pointRadius: 2,
+                },
+                {
+                    label: 'ผลทดสอบ',
+                    data: radar,
+                    backgroundColor: `${ringColor}30`,
+                    borderColor: ringColor,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: ringColor,
+                    pointRadius: 3,
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { r: { min: 0, max: 100, ticks: { display: false }, grid: { color: '#f1f5f9' }, angleLines: { color: '#e2e8f0' } } },
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } }
+        }
+    });
+
+    // Debug JSON
+    document.getElementById('debug-json').innerText = JSON.stringify({
+        mode: currentMode,
+        steps: allResults.map(r => ({
+            type: r.test_type,
+            taps: r.tap_count,
+            risk: r.risk_probability,
+            calib_ht_ratio: r.calibrated_features?._ht_ratio,
+            calib_ft_ratio: r.calibrated_features?._ft_ratio,
+            ht_mean_raw: r.raw_features?.ht_mean?.toFixed(2),
+            ht_cv_raw: r.raw_features?.ht_cv?.toFixed(4),
+        }))
+    }, null, 2);
+}
+
+function toggleDebug() {
+    document.getElementById('debug-panel').classList.toggle('hidden');
+}
+
+function simulatePDF() {
+    alert('📄 ฟีเจอร์ส่งออก PDF จะพร้อมใช้งานเมื่อเชื่อมต่อ Backend ครับ');
+}
+
+function clearAll() {
+    clearInterval(warmupInterval);
+    clearInterval(testInterval);
+    window._warmupActive = false;
+    window._testActive = false;
+    removeInputListeners();
+}
+</script>
+</body>
+</html>
