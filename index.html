@@ -859,7 +859,7 @@ async function finishTest() {
     };
 
     try {
-        const resp = await fetch('parkinson-backend-production-6af7.up.railway.app/api/analyze', {
+        const resp = await fetch('https://parkinson-backend-production-6af7.up.railway.app/predict/keyboard', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             
