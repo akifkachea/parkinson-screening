@@ -1,0 +1,83 @@
+{
+  "feature_cols": [
+    "HT_mean",
+    "HT_std",
+    "HT_median",
+    "HT_iqr",
+    "HT_cv",
+    "HT_p10",
+    "HT_p90",
+    "HT_p90_p10_ratio",
+    "HT_skew",
+    "HT_kurt",
+    "HT_autocorr_lag1",
+    "HT_autocorr_lag2",
+    "HT_autocorr_lag3",
+    "FT_mean",
+    "FT_std",
+    "FT_median",
+    "FT_iqr",
+    "FT_cv",
+    "FT_skew",
+    "FT_kurt",
+    "FT_p90",
+    "FT_autocorr_lag1",
+    "pause_500ms_ratio",
+    "pause_1000ms_ratio",
+    "pause_2000ms_ratio",
+    "IKI_entropy",
+    "typing_speed_kps",
+    "n_keystrokes",
+    "bimanual_asymmetry",
+    "bimanual_ratio",
+    "left_HT_cv",
+    "right_HT_cv"
+  ],
+  "cv_metrics": {
+    "auc": {
+      "mean": 0.8489197530864198,
+      "std": 0.0592045786816305
+    },
+    "acc": {
+      "mean": 0.777532679738562,
+      "std": 0.05224390536947771
+    },
+    "f1": {
+      "mean": 0.7646201476542034,
+      "std": 0.05324883466039877
+    },
+    "precision": {
+      "mean": 0.8287878787878787,
+      "std": 0.14242424242424243
+    },
+    "recall": {
+      "mean": 0.7416666666666666,
+      "std": 0.13540064007726602
+    },
+    "balanced_acc": {
+      "mean": 0.7777777777777778,
+      "std": 0.05178153300640903
+    }
+  },
+  "bootstrap_auc_ci": {
+    "lower": 0.7466600221483942,
+    "upper": 0.9161388888888888,
+    "mean": 0.8349347682542901
+  },
+  "confusion_matrix": [
+    [
+      35,
+      8
+    ],
+    [
+      11,
+      31
+    ]
+  ],
+  "sensitivity": 0.7380952380952381,
+  "specificity": 0.813953488372093,
+  "balanced_accuracy": 0.7760243632336656,
+  "n_subjects": 85,
+  "n_pd": 42,
+  "n_ctl": 43
+}
