@@ -19,8 +19,8 @@
                         mono: ['IBM Plex Mono', 'monospace'],
                     },
                     colors: {
-                        ink:    { 950:'#0A1220', 900:'#101A2E', 800:'#1B2A44', 700:'#2A3B5C', 600:'#415375' },
-                        paper:  { 50:'#F8F9F7', 100:'#F1F3EF', 200:'#E7EAE5' },
+                        ink:    { 950:'#05070C', 900:'#0A0F1A', 800:'#141C2E', 700:'#212B42', 600:'#374361' },
+                        paper:  { 50:'#F7F9FB', 100:'#EEF2F6', 200:'#E1E7EE' },
                         signal: { 50:'#E9F4F3', 100:'#CFE9E7', 300:'#5FB8B4', 400:'#17A39E', 500:'#0E7C7B', 600:'#0B615F', 700:'#094D4C' },
                         amber:  { 50:'#FBF1E4', 100:'#F5E2C4', 400:'#DB9640', 500:'#C97C2B', 600:'#A9641F', 700:'#8A5119' },
                         coral:  { 50:'#FBEAE9', 100:'#F5D0CD', 400:'#D46760', 500:'#C4453C', 600:'#A3352E', 700:'#82281F' },
@@ -35,7 +35,15 @@
     <style>
         * { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
-        body { font-family: 'Sarabun', sans-serif; background: #F8F9F7; color: #101A2E; }
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background:
+                radial-gradient(ellipse 900px 500px at 50% -10%, rgba(31,168,219,0.10), transparent 60%),
+                repeating-linear-gradient(0deg, rgba(95,196,234,0.035) 0px, rgba(95,196,234,0.035) 1px, transparent 1px, transparent 40px),
+                repeating-linear-gradient(90deg, rgba(95,196,234,0.035) 0px, rgba(95,196,234,0.035) 1px, transparent 1px, transparent 40px),
+                #070A10;
+            color: #101A2E;
+        }
         .font-mono-num { font-family: 'IBM Plex Mono', monospace; font-feature-settings: 'tnum'; }
         ::selection { background: #CFE9E7; color: #094D4C; }
 
@@ -91,7 +99,7 @@
         .risk-ring-fill { transition: stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1); }
 
         /* ── CARDS ── */
-        .card { background:#FFFFFF; border-radius:18px; box-shadow:0 1px 2px rgba(16,26,46,0.03), 0 6px 24px rgba(16,26,46,0.05); border:1px solid #E7EAE5; }
+        .card { background:#FFFFFF; border-radius:14px; box-shadow:0 1px 2px rgba(16,26,46,0.03), 0 6px 24px rgba(16,26,46,0.05); border:1px solid #E1E7EE; }
 
         /* ── BADGE ── */
         .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:999px; font-size:0.68rem; font-weight:700; letter-spacing:.02em; }
@@ -182,6 +190,71 @@
             .key-btn { width:82px; height:82px; font-size:1.6rem; border-radius:16px; }
             .touch-btn { width:118px; height:118px; border-radius:22px; }
         }
+
+        /* ══════════ ANIMATED HAND-PLACEMENT DEMO (prep screen) ══════════ */
+        .tap-target-demo {
+            position: relative;
+            width: 52px; height: 52px;
+            border-radius: 14px;
+            border: 2px solid #CFE9E7;
+            background: #FFFFFF;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 1.1rem; color: #0B615F;
+            box-shadow: 0 1px 2px rgba(16,26,46,0.05);
+            animation: tap-target-left 2.6s ease-in-out infinite;
+        }
+        .tap-target-demo--right {
+            border-color: #F5E2C4; color: #A9641F;
+            animation-name: tap-target-right;
+        }
+        .tap-target-ripple {
+            position: absolute; inset: -2px; border-radius: inherit;
+            border: 2px solid transparent; opacity: 0; pointer-events: none;
+        }
+        @keyframes tap-target-left {
+            0%, 12%, 42%, 100% { transform: scale(1); background: #FFFFFF; box-shadow: 0 1px 2px rgba(16,26,46,0.05); }
+            22%, 32% { transform: scale(0.88); background: #E9F4F3; box-shadow: 0 0 0 7px rgba(31,168,219,0.22); }
+        }
+        @keyframes tap-target-right {
+            0%, 62%, 92%, 100% { transform: scale(1); background: #FFFFFF; box-shadow: 0 1px 2px rgba(16,26,46,0.05); }
+            72%, 82% { transform: scale(0.88); background: #FBF1E4; box-shadow: 0 0 0 7px rgba(219,150,64,0.25); }
+        }
+        .tap-finger-demo {
+            position: absolute; top: -2px; font-size: 1.5rem; color: #415375;
+            animation: tap-finger-move 2.6s ease-in-out infinite;
+            filter: drop-shadow(0 3px 4px rgba(16,26,46,0.15));
+        }
+        @keyframes tap-finger-move {
+            0%, 12%   { transform: translate(-38px, 0) rotate(0deg); }
+            22%, 32%  { transform: translate(-38px, 14px) rotate(-6deg); }
+            42%       { transform: translate(-38px, 0) rotate(0deg); }
+            52%       { transform: translate(38px, 0) rotate(0deg); }
+            62%, 72%  { transform: translate(38px, 14px) rotate(6deg); }
+            82%, 100% { transform: translate(38px, 0) rotate(0deg); }
+        }
+        @media (min-width: 640px) {
+            @keyframes tap-finger-move {
+                0%, 12%   { transform: translate(-58px, 0) rotate(0deg); }
+                22%, 32%  { transform: translate(-58px, 14px) rotate(-6deg); }
+                42%       { transform: translate(-58px, 0) rotate(0deg); }
+                52%       { transform: translate(58px, 0) rotate(0deg); }
+                62%, 72%  { transform: translate(58px, 14px) rotate(6deg); }
+                82%, 100% { transform: translate(58px, 0) rotate(0deg); }
+            }
+        }
+
+        /* ══════════ EXTRA AMBIENT MOTION ══════════ */
+        @keyframes soft-breathe { 0%,100% { transform: scale(1); opacity:1; } 50% { transform: scale(1.06); opacity:.85; } }
+        .breathe { animation: soft-breathe 2.8s ease-in-out infinite; }
+
+        @keyframes icon-wiggle { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+        .stat-tile:hover i { animation: icon-wiggle 0.5s ease-in-out; }
+
+        @keyframes float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        .float-y { animation: float-y 3.2s ease-in-out infinite; }
+
+        @keyframes ring-expand { 0% { transform: scale(0.9); opacity: .5; } 100% { transform: scale(1.5); opacity: 0; } }
+        .ring-expand { animation: ring-expand 1.8s ease-out infinite; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -235,7 +308,7 @@
     </div>
 </header>
 
-<main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8 space-y-6">
+<main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8 space-y-6 sm:my-6 sm:rounded-[28px] sm:overflow-hidden bg-paper-50 sm:shadow-[0_30px_80px_rgba(0,0,0,0.55)] sm:border sm:border-white/[0.06]">
 
 <!-- ══════════════ SCREEN: WELCOME ══════════════ -->
 <div id="screen-welcome" class="screen active space-y-10">
@@ -268,7 +341,7 @@
             </div>
             <div class="relative max-w-2xl mx-auto space-y-6">
                 <span class="eyebrow inline-flex items-center gap-1.5 text-signal-600 bg-white border border-signal-100 px-3 py-1.5 rounded-full shadow-sm">
-                    <span class="w-1.5 h-1.5 rounded-full bg-signal-500"></span> 90 วินาที · ไม่ต้องติดตั้งแอป
+                    <span class="w-1.5 h-1.5 rounded-full bg-signal-500 breathe"></span> 90 วินาที · ไม่ต้องติดตั้งแอป
                 </span>
                 <h2 class="text-[2.1rem] sm:text-5xl font-bold text-ink-900 leading-[1.15] tracking-tight">
                     ฟังจังหวะการพิมพ์ของคุณ<br class="hidden sm:block"> เพื่อประเมินสัญญาณเริ่มต้น
@@ -498,8 +571,8 @@
                 <rect width="100%" height="100%" fill="url(#prep-dots)"/>
             </svg>
             <!-- floating corner glyphs -->
-            <i class="fa-solid fa-fingerprint absolute top-4 left-5 text-signal-300/40 text-xl"></i>
-            <i class="fa-solid fa-wave-square absolute bottom-4 right-6 text-amber-300/50 text-lg"></i>
+            <i class="fa-solid fa-fingerprint absolute top-4 left-5 text-signal-300/40 text-xl float-y"></i>
+            <i class="fa-solid fa-wave-square absolute bottom-4 right-6 text-amber-300/50 text-lg float-y" style="animation-delay:1.1s"></i>
 
             <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
                 <svg class="absolute inset-0 spin-slow" viewBox="0 0 100 100">
@@ -515,17 +588,24 @@
             <h3 id="prep-title" class="relative text-xl font-bold text-ink-900"></h3>
             <p id="prep-desc" class="relative text-sm text-ash-600 leading-relaxed max-w-sm mx-auto"></p>
 
-            <!-- mini illustrative finger-tap preview -->
-            <div class="relative flex items-center justify-center gap-3 pt-1">
-                <span class="w-9 h-9 rounded-full bg-white border-2 border-signal-200 shadow-sm flex items-center justify-center text-signal-500 text-xs font-mono-num font-bold">L</span>
-                <div class="flex gap-1 items-end h-5">
-                    <span class="w-1 rounded-full bg-signal-300" style="height:8px"></span>
-                    <span class="w-1 rounded-full bg-signal-400" style="height:16px"></span>
-                    <span class="w-1 rounded-full bg-amber-400" style="height:10px"></span>
-                    <span class="w-1 rounded-full bg-amber-300" style="height:18px"></span>
-                    <span class="w-1 rounded-full bg-signal-300" style="height:7px"></span>
+            <!-- animated hand-placement demo — สาธิตจังหวะแตะสลับซ้าย-ขวาก่อนเริ่มจริง -->
+            <div class="relative pt-2">
+                <div class="relative flex items-center justify-center h-[72px]">
+                    <div class="flex items-center gap-14 sm:gap-20">
+                        <div id="prep-target-left" class="tap-target-demo">
+                            <span id="prep-target-left-label" class="font-mono-num">F</span>
+                            <span class="tap-target-ripple"></span>
+                        </div>
+                        <div id="prep-target-right" class="tap-target-demo tap-target-demo--right">
+                            <span id="prep-target-right-label" class="font-mono-num">K</span>
+                            <span class="tap-target-ripple"></span>
+                        </div>
+                    </div>
+                    <div id="prep-finger-demo" class="tap-finger-demo">
+                        <i class="fa-solid fa-hand-point-down"></i>
+                    </div>
                 </div>
-                <span class="w-9 h-9 rounded-full bg-white border-2 border-amber-200 shadow-sm flex items-center justify-center text-amber-500 text-xs font-mono-num font-bold">R</span>
+                <p class="relative text-[0.65rem] text-ash-400 text-center mt-1">ตัวอย่างจังหวะ — แตะสลับซ้าย-ขวาให้สม่ำเสมอแบบนี้</p>
             </div>
         </div>
 
@@ -760,7 +840,7 @@
         </p>
         <div class="flex items-center gap-3">
             <span id="mci-badge" class="badge border text-xs font-bold px-3 py-1.5 rounded-full"></span>
-            <span class="text-xs text-ash-500">MCI: <span id="mci-value" class="font-mono-num font-bold text-ink-700">--</span> SD จากค่าเฉลี่ยทั่วไป</span>
+            <span class="text-xs text-ash-500">เบี่ยงไป <span id="mci-value" class="font-mono-num font-bold text-ink-700">--</span> เท่าของ SD จากค่าเฉลี่ย</span>
         </div>
         <p id="mci-context" class="text-[0.65rem] text-ash-400"></p>
     </div>
@@ -1302,6 +1382,11 @@ function ingestMobileResults(results) {
             // ที่ไม่รู้จักทิ้ง ค่านี้จะหายไปและ default เป็น false (ไม่แสดงเตือน) — ควรตรวจกับ
             // backend จริงว่า relay field นี้ผ่านมาด้วยหรือไม่
             is_mock: r.is_mock || false,
+            // ── MCI (ฝั่งมือถือ) — ต้อง relay ผ่าน backend ด้วยเช่นกัน มิฉะนั้นจะหายไปเหมือน is_mock ──
+            mci_features: r.mci_features || null,
+            mci_value: r.mci_value ?? null,
+            mci_band: r.mci_band || null,
+            mci_band_th: r.mci_band_th || null,
         });
     });
 }
@@ -1341,6 +1426,20 @@ function setupTest(type) {
     document.getElementById('prep-icon').innerText = icons[type];
     document.getElementById('prep-title').innerText = titles[type];
     document.getElementById('prep-desc').innerHTML = descs[type];
+
+    // อัปเดตป้ายชื่อ + ไอคอนในอนิเมชันสาธิตวางมือ ให้ตรงกับโหมดที่เลือก
+    const leftLabel  = document.getElementById('prep-target-left-label');
+    const rightLabel = document.getElementById('prep-target-right-label');
+    const fingerIcon = document.getElementById('prep-finger-demo')?.querySelector('i');
+    if (type === 'pc') {
+        leftLabel.innerText = 'F';
+        rightLabel.innerText = 'K';
+        if (fingerIcon) fingerIcon.className = 'fa-solid fa-hand-point-down';
+    } else {
+        leftLabel.innerText = 'ชี้';
+        rightLabel.innerText = 'กลาง';
+        if (fingerIcon) fingerIcon.className = 'fa-solid fa-hand-pointer';
+    }
 
     showPhase('prep');
 }
@@ -1567,8 +1666,21 @@ function handleTestKeyUp(e) {
 function handleTestTouch(e, side, action) {
     e.preventDefault();
     if (!window._testActive) return;
-    testLog.push({ key: side, action: action === 'down' ? 'down' : 'up', t: performance.now() });
     const btn = document.getElementById(`test-btn-${side}`);
+
+    // เก็บพิกัดจุดแตะเทียบกับจุดกึ่งกลางปุ่ม (px) เฉพาะตอน 'down' — ใช้คำนวณ sea/bca/vec
+    // สำหรับ /api/touch_motor_consistency ภายหลัง (ยังไม่มีการเก็บพิกัดนี้มาก่อน)
+    let x = null, y = null;
+    if (action === 'down' && btn) {
+        const rect = btn.getBoundingClientRect();
+        const touch = (e.touches && e.touches[0]) || e;
+        if (touch && typeof touch.clientX === 'number') {
+            x = touch.clientX - (rect.left + rect.width / 2);
+            y = touch.clientY - (rect.top + rect.height / 2);
+        }
+    }
+
+    testLog.push({ key: side, action: action === 'down' ? 'down' : 'up', t: performance.now(), x, y });
     if (action === 'down') {
         if (btn) { btn.classList.add('pressed'); spawnBurst(btn, '#17A39E'); }
         tapCount++;
@@ -1610,6 +1722,8 @@ async function finishTest() {
     showPhase('processing');
     animateProcessBar();
 
+    const isMobileTest = typeof currentTestType === 'string' && currentTestType.startsWith('mobile');
+
     const rawFeatures = computeFeatures(testLog);
     const calibFeatures = applyRatioNormalizer(rawFeatures);
     const { ht, ft } = extractHtFt(testLog);
@@ -1623,48 +1737,95 @@ async function finishTest() {
         risk_probability: null,
         radar: null,
         is_mock: false,
+        // ── ฝั่งมือถือเท่านั้น (MCI, แยกจาก risk_probability ฝั่งคีย์บอร์ดเด็ดขาด) ──
+        mci_features: null,
+        mci_value: null,
+        mci_band: null,
+        mci_band_th: null,
     };
 
-    try {
-        const resp = await fetch(`${API_BASE}/api/analyze`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                test_type: currentTestType,
-                device: companionMode ? 'mobile' : currentMode,
-                ht_array_ms: ht,
-                ft_array_ms: ft,
-                calib_baseline: calibBaseline,
-                calibrated_features: calibFeatures,
-                raw_features: rawFeatures,
-                tap_count: tapCount,
-                subject_id: subjectId || null,
-                subject_group: subjectGroup || null,
-                subject_age: subjectAge
-            })
-        });
-        if (resp.ok) {
-            const data = await resp.json();
-            if (data.status === 'success' && data.analysis) {
-                stepResult.risk_probability = data.analysis.risk_percentage;
-                stepResult.radar = data.analysis.radar_metrics;
-                stepResult.xai_title = data.analysis.risk_level;
-                stepResult.xai_desc  = data.analysis.xai_explanation;
+    if (isMobileTest) {
+        // ── มือถือ: เรียก /api/touch_motor_consistency ไม่ใช่ /api/analyze ──
+        const touchFeatures = computeMobileTouchFeatures(testLog);
+        stepResult.mci_features = touchFeatures;
+
+        try {
+            const resp = await fetch(`${API_BASE}/api/touch_motor_consistency`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tnt: touchFeatures.tnt,
+                    bca: touchFeatures.bca,
+                    dblt: touchFeatures.dblt,
+                    sea: touchFeatures.sea,
+                    its: touchFeatures.its,
+                    vec: touchFeatures.vec,
+                    subject_id: subjectId || null,
+                    subject_age: subjectAge
+                })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.status === 'success' && data.mci_analysis) {
+                    stepResult.mci_value = data.mci_analysis.motor_consistency_index;
+                    stepResult.mci_band = data.mci_analysis.band;
+                    stepResult.mci_band_th = data.mci_analysis.band_th;
+                    stepResult.xai_desc = data.mci_analysis.disclaimer;
+                } else {
+                    stepResult.is_mock = true;
+                    stepResult.mci_band_th = 'คำนวณไม่ได้ (ข้อมูลจากการทดสอบไม่พอ) — แนะนำทำแบบทดสอบใหม่';
+                }
             } else {
-                // backend ตอบกลับมาแต่ไม่ได้อยู่ในรูปแบบที่คาดไว้ — fallback เป็น mock พร้อม flag ให้ชัดเจน
+                stepResult.is_mock = true;
+                stepResult.mci_band_th = 'เชื่อมต่อ backend ฝั่งมือถือไม่สำเร็จ';
+            }
+        } catch (_) {
+            stepResult.is_mock = true;
+            stepResult.mci_band_th = 'เชื่อมต่อ backend ฝั่งมือถือไม่สำเร็จ';
+        }
+    } else {
+        // ── คีย์บอร์ด: /api/analyze เหมือนเดิม ──
+        try {
+            const resp = await fetch(`${API_BASE}/api/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    test_type: currentTestType,
+                    device: companionMode ? 'mobile' : currentMode,
+                    ht_array_ms: ht,
+                    ft_array_ms: ft,
+                    calib_baseline: calibBaseline,
+                    calibrated_features: calibFeatures,
+                    raw_features: rawFeatures,
+                    tap_count: tapCount,
+                    subject_id: subjectId || null,
+                    subject_group: subjectGroup || null,
+                    subject_age: subjectAge
+                })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.status === 'success' && data.analysis) {
+                    stepResult.risk_probability = data.analysis.risk_percentage;
+                    stepResult.radar = data.analysis.radar_metrics;
+                    stepResult.xai_title = data.analysis.risk_level;
+                    stepResult.xai_desc  = data.analysis.xai_explanation;
+                } else {
+                    // backend ตอบกลับมาแต่ไม่ได้อยู่ในรูปแบบที่คาดไว้ — fallback เป็น mock พร้อม flag ให้ชัดเจน
+                    stepResult.risk_probability = mockRisk(calibFeatures);
+                    stepResult.radar = mockRadar(calibFeatures);
+                    stepResult.is_mock = true;
+                }
+            } else {
                 stepResult.risk_probability = mockRisk(calibFeatures);
                 stepResult.radar = mockRadar(calibFeatures);
                 stepResult.is_mock = true;
             }
-        } else {
+        } catch (_) {
             stepResult.risk_probability = mockRisk(calibFeatures);
             stepResult.radar = mockRadar(calibFeatures);
             stepResult.is_mock = true;
         }
-    } catch (_) {
-        stepResult.risk_probability = mockRisk(calibFeatures);
-        stepResult.radar = mockRadar(calibFeatures);
-        stepResult.is_mock = true;
     }
 
     if (companionMode) {
@@ -1677,7 +1838,11 @@ async function finishTest() {
             raw_features: stepResult.raw_features,
             calibrated_features: stepResult.calibrated_features,
             tap_count: stepResult.tap_count,
-            is_mock: stepResult.is_mock
+            is_mock: stepResult.is_mock,
+            mci_features: stepResult.mci_features,
+            mci_value: stepResult.mci_value,
+            mci_band: stepResult.mci_band,
+            mci_band_th: stepResult.mci_band_th,
         });
         if (companionResults.length >= companionQueue.length) {
             queueIdx++;
@@ -1784,6 +1949,56 @@ function applyRatioNormalizer(features) {
     return calibrated;
 }
 
+// ─────────────────────────────────────────────────────────
+//  MOBILE ARM — คำนวณ tnt/bca/dblt/sea/its/vec สำหรับ /api/touch_motor_consistency
+//  อ้างอิงคำอธิบายจาก motor_consistency_index.py (บัญชี 1):
+//    tnt  = total number of taps
+//    bca  = bivariate contour ellipse area (ความแม่นยำเชิงพื้นที่ของจุดแตะ)
+//    dblt = double-tap errors (แตะปุ่มเดิมซ้ำติดกันแทนที่จะสลับตามคำสั่ง)
+//    sea  = spatial error mean (ระยะห่างเฉลี่ยจากจุดกึ่งกลางปุ่ม)
+//    its  = inter-tap interval SD (ความสม่ำเสมอของจังหวะ, ms)
+//    vec  = velocity change (บ่งชี้ความล้า)
+//
+//  ⚠️ หมายเหตุสำคัญ: baseline ใน pipeline_summary_v2.json (PLOS ONE AFT, n=14) ได้ sea/bca
+//  มาจากอุปกรณ์/หน่วยของการศึกษาต้นฉบับ ซึ่งไม่ได้ระบุไว้ในเอกสารที่มี ว่าเป็น px, cm, หรือ mm
+//  ที่นี่คำนวณจากพิกัด px ที่จับได้จริงบนหน้าจอผู้ใช้ (ต่างอุปกรณ์ ต่าง DPI) — ตัวเลข sea/bca
+//  จึงเป็น "ค่าประมาณที่ดีที่สุดเท่าที่ข้อมูลที่มีอยู่จะให้ได้" ไม่ยืนยัน 100% ว่าสเกลตรงกับ
+//  baseline ทุกประการ ควรให้บัญชี 1 ยืนยันหน่วยของ paper ต้นฉบับก่อนใช้ตัดสินใจอะไรที่สำคัญ
+//  tnt/dblt/its คำนวณจากเวลาล้วน ๆ (ไม่มีปัญหาเรื่องหน่วย px vs cm) จึงมั่นใจได้มากกว่า
+function computeMobileTouchFeatures(log) {
+    const downs = log.filter(e => e.action === 'down').sort((a, b) => a.t - b.t);
+    const tnt = downs.length;
+
+    let dblt = 0;
+    for (let i = 1; i < downs.length; i++) {
+        if (downs[i].key === downs[i - 1].key) dblt++;
+    }
+
+    const intervals = [];
+    for (let i = 1; i < downs.length; i++) intervals.push(downs[i].t - downs[i - 1].t);
+    const its = intervals.length > 1 ? std(intervals) : null;
+
+    let sea = null, bca = null, vec = null;
+    const pts = downs.filter(d => d.x != null && d.y != null && Number.isFinite(d.x) && Number.isFinite(d.y));
+    if (pts.length >= 3) {
+        sea = mean(pts.map(p => Math.sqrt(p.x * p.x + p.y * p.y)));
+
+        const mx = mean(pts.map(p => p.x)), my = mean(pts.map(p => p.y));
+        const varX = mean(pts.map(p => (p.x - mx) ** 2));
+        const varY = mean(pts.map(p => (p.y - my) ** 2));
+        const covXY = mean(pts.map(p => (p.x - mx) * (p.y - my)));
+        const det = varX * varY - covXY * covXY;
+        // 5.991 = chi-square critical value (df=2, 95%) สำหรับ bivariate contour ellipse area มาตรฐาน
+        bca = det > 0 ? 5.991 * Math.PI * Math.sqrt(det) : null;
+    }
+    if (intervals.length >= 4) {
+        const half = Math.floor(intervals.length / 2);
+        vec = mean(intervals.slice(half)) - mean(intervals.slice(0, half));
+    }
+
+    return { tnt, dblt, its, sea, bca, vec };
+}
+
 function mockRisk(f) {
     let score = 10;
     if (f.ht_cv  != null && f.ht_cv  > 0.25) score += 20;
@@ -1832,7 +2047,16 @@ function animateProcessBar() {
 // ─────────────────────────────────────────────────────────
 //  MOBILE ARM — Motor Consistency Index (experimental, ไม่ใช่ risk score)
 // ─────────────────────────────────────────────────────────
-function renderMobileMciCard(hasMobileResult, mobileScore, hasKeyboardResult) {
+// bandColor ต้องอ้างอิงตาม band ที่ backend (motor_consistency_index.py) ส่งมาจริง ไม่คำนวณ
+// threshold เองในฝั่ง frontend อีกต่อไป (ของเดิมคิด threshold 35/60 บนสเกล 0-100 ซึ่งผิด เพราะ
+// mci ที่ backend ส่งมาเป็นสเกล SD จริง ๆ อยู่ที่ประมาณ 0-3 เท่านั้น)
+const MCI_BAND_COLORS = {
+    typical: '#0E7C7B',
+    some_deviation: '#C97C2B',
+    notable_deviation: '#8A6FBF',
+};
+
+function renderMobileMciCard(hasMobileResult, mciValue, mciBandTh, mciBand, hasKeyboardResult) {
     const card = document.getElementById('mci-card');
     if (!card) return;
 
@@ -1842,21 +2066,14 @@ function renderMobileMciCard(hasMobileResult, mobileScore, hasKeyboardResult) {
     }
     card.classList.remove('hidden');
 
-    // แปลง score (0-100 scale เดียวกับ backend) เป็น band เชิงพรรณนา — ไม่ใช่ risk level
-    let band, bandLabel, bandColor;
-    if (mobileScore < 35) {
-        band = 'typical'; bandLabel = 'ใกล้เคียงค่าเฉลี่ยทั่วไป'; bandColor = '#0E7C7B';
-    } else if (mobileScore < 60) {
-        band = 'some_deviation'; bandLabel = 'มีความแตกต่างจากค่าเฉลี่ยทั่วไปบ้าง'; bandColor = '#C97C2B';
-    } else {
-        band = 'notable_deviation'; bandLabel = 'มีความแตกต่างจากค่าเฉลี่ยทั่วไปค่อนข้างมาก'; bandColor = '#8A6FBF';
-    }
+    const bandColor = MCI_BAND_COLORS[mciBand] || '#8A9793';
+    const bandLabel = mciBandTh || 'ไม่สามารถคำนวณได้';
 
     document.getElementById('mci-badge').innerText = bandLabel;
     document.getElementById('mci-badge').style.color = bandColor;
     document.getElementById('mci-badge').style.borderColor = bandColor + '40';
     document.getElementById('mci-badge').style.background = bandColor + '14';
-    document.getElementById('mci-value').innerText = mobileScore;
+    document.getElementById('mci-value').innerText = mciValue != null ? mciValue.toFixed(2) : '--';
 
     document.getElementById('mci-context').innerText = hasKeyboardResult
         ? 'ค่านี้เป็นข้อมูลเสริมประกอบผลฝั่งคีย์บอร์ดด้านบน ไม่ใช่ตัวชี้วัดหลัก'
@@ -1878,10 +2095,17 @@ function renderDashboard() {
     const hasKeyboardResult = kbRisks.length > 0;
     const avgRisk = hasKeyboardResult ? Math.round(kbRisks.reduce((a,b) => a+b,0) / kbRisks.length) : null;
 
-    const mbRisks = mobileResultsArr.map(r => r.risk_probability).filter(v => v != null);
-    const hasMobileResult = mbRisks.length > 0;
-    // ค่าเฉลี่ย "deviation" ฝั่งมือถือ ใช้ scale เดียวกับ backend (0-100) แต่ตีความเป็น MCI band ไม่ใช่ risk level
-    const mobileScore = hasMobileResult ? Math.round(mbRisks.reduce((a,b) => a+b,0) / mbRisks.length) : null;
+    // ── MCI ฝั่งมือถือ — ใช้ mci_value ที่ backend คำนวณมาให้ตรง ๆ (สเกล |z-score| เฉลี่ย) ──
+    // ไม่ใช่ risk_probability อีกต่อไป (ของเดิมเอา 0-100 มาเข้าใจผิดว่าเป็น SD)
+    const mciResults = mobileResultsArr.filter(r => r.mci_value != null);
+    const hasMobileResult = mciResults.length > 0;
+    const mobileMciValue = hasMobileResult
+        ? mciResults.reduce((a, r) => a + r.mci_value, 0) / mciResults.length
+        : null;
+    // แสดง band ของผลล่าสุด (ผลเฉลี่ยหลายรอบอาจตกคนละ band กับที่ backend ระบุไว้ต่อรอบ)
+    const lastMciResult = [...mciResults].reverse()[0];
+    const mobileBand = lastMciResult ? lastMciResult.mci_band : null;
+    const mobileBandTh = lastMciResult ? lastMciResult.mci_band_th : null;
 
     const lastWithRadar = [...allResults].reverse().find(r => r.radar);
     const radar = lastWithRadar ? lastWithRadar.radar : [75, 68, 80, 72, 70];
@@ -1921,7 +2145,7 @@ function renderDashboard() {
         riskPctEl.innerText = 'N/A';
     }
 
-    renderMobileMciCard(hasMobileResult, mobileScore, hasKeyboardResult);
+    renderMobileMciCard(hasMobileResult, mobileMciValue, mobileBandTh, mobileBand, hasKeyboardResult);
 
     let verdict, verdictTitle, verdictColor;
     if (!hasKeyboardResult) {
@@ -2045,32 +2269,32 @@ function flattenFeatureObject(obj, prefix) {
     return out;
 }
 
-function downloadCSVExport() {
-    if (!allResults.length) {
-        alert('ยังไม่มีข้อมูลผลการทดสอบให้ export');
-        return;
-    }
-
-    // รวบรวมชื่อคอลัมน์ raw/calibrated feature ทั้งหมดที่พบในทุก step (บาง step อาจมี feature ไม่ครบกัน)
+// สร้าง CSV จากชุดผลลัพธ์ที่กรองมาแล้ว (ใช้ร่วมกันทั้งไฟล์คีย์บอร์ดและมือถือ)
+// คอลัมน์ raw/calib จะถูกดึงเฉพาะจาก results ที่ส่งเข้ามา ไม่ปนกับ arm อื่น
+function buildCSVForResults(results, timestamp) {
     const rawKeys = new Set();
     const calibKeys = new Set();
-    allResults.forEach(r => {
+    const mciFeatKeys = new Set();
+    results.forEach(r => {
         Object.keys(r.raw_features || {}).forEach(k => rawKeys.add(k));
         Object.keys(r.calibrated_features || {}).forEach(k => calibKeys.add(k));
+        Object.keys(r.mci_features || {}).forEach(k => mciFeatKeys.add(k));
     });
 
     const baseCols = [
         'session_timestamp', 'subject_id', 'subject_group', 'subject_age',
-        'test_type', 'tap_count', 'is_mock', 'risk_probability', 'xai_title'
+        'test_type', 'tap_count', 'is_mock', 'risk_probability', 'xai_title',
+        'mci_value', 'mci_band', 'mci_band_th',
     ];
     const rawCols = [...rawKeys].map(k => `raw_${k}`);
     const calibCols = [...calibKeys].map(k => `calib_${k}`);
-    const allCols = [...baseCols, ...rawCols, ...calibCols];
+    const mciFeatCols = [...mciFeatKeys].map(k => `mcifeat_${k}`); // tnt/bca/dblt/sea/its/vec ที่ส่งเข้า /api/touch_motor_consistency
+    const allCols = [...baseCols, ...rawCols, ...calibCols, ...mciFeatCols];
 
-    const timestamp = new Date().toISOString();
-    const rows = allResults.map(r => {
+    const rows = results.map(r => {
         const rawFlat = flattenFeatureObject(r.raw_features, 'raw');
         const calibFlat = flattenFeatureObject(r.calibrated_features, 'calib');
+        const mciFeatFlat = flattenFeatureObject(r.mci_features, 'mcifeat');
         const rowObj = {
             session_timestamp: timestamp,
             subject_id: subjectId || '',
@@ -2081,23 +2305,54 @@ function downloadCSVExport() {
             is_mock: r.is_mock ? 'TRUE' : 'FALSE',
             risk_probability: r.risk_probability ?? '',
             xai_title: r.xai_title || '',
+            mci_value: r.mci_value ?? '',
+            mci_band: r.mci_band || '',
+            mci_band_th: r.mci_band_th || '',
             ...rawFlat,
             ...calibFlat,
+            ...mciFeatFlat,
         };
         return allCols.map(c => csvEscape(rowObj[c])).join(',');
     });
 
-    const csvContent = [allCols.map(csvEscape).join(','), ...rows].join('\n');
+    return [allCols.map(csvEscape).join(','), ...rows].join('\n');
+}
+
+// ดาวน์โหลด Blob CSV เดี่ยว ๆ ด้วยชื่อไฟล์ที่กำหนด
+function triggerCSVDownload(csvContent, filename) {
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM เพื่อให้ Excel อ่านภาษาไทยถูกต้อง
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const safeSubjectId = (subjectId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '');
     a.href = url;
-    a.download = `pd_screening_${safeSubjectId}_${timestamp.slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function downloadCSVExport() {
+    if (!allResults.length) {
+        alert('ยังไม่มีข้อมูลผลการทดสอบให้ export');
+        return;
+    }
+
+    // แยกผลตาม arm ก่อน export — คีย์บอร์ดกับมือถือ ไม่ใช้คอลัมน์ feature ชุดเดียวกันปนกันอีกต่อไป
+    const keyboardResults = allResults.filter(r => r.test_type === 'pc');
+    const mobileResults = allResults.filter(r => typeof r.test_type === 'string' && r.test_type.startsWith('mobile'));
+
+    const timestamp = new Date().toISOString();
+    const safeSubjectId = (subjectId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '');
+    const tsSlug = timestamp.slice(0, 19).replace(/[:T]/g, '-');
+
+    if (keyboardResults.length) {
+        const csv = buildCSVForResults(keyboardResults, timestamp);
+        triggerCSVDownload(csv, `pd_screening_${safeSubjectId}_keyboard_${tsSlug}.csv`);
+    }
+    if (mobileResults.length) {
+        const csv = buildCSVForResults(mobileResults, timestamp);
+        triggerCSVDownload(csv, `pd_screening_${safeSubjectId}_mobile_${tsSlug}.csv`);
+    }
 }
 
 // ─────────────────────────────────────────────────────────
